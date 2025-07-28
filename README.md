@@ -81,7 +81,9 @@ These restrictions pushed me to deeply understand memory management, function-ba
 
 Built with ❤️ as a Semester 1 Final Project  
 Author: **Muhammad Sameer Kayani**  
-[LinkedIn](https://www.linkedin.com/in/sameer-kayani) | [GitHub](https://github.com/SameerKayani72)
+[LinkedIn](www.linkedin.com/in/
+muhammad-sameer-kayani-b0850136a
+) | [GitHub](https://github.com/SameerKayani72)
 
 ---
 
