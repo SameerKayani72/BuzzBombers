@@ -1,0 +1,4784 @@
+#include <iostream>
+#include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
+#include <fstream>
+
+using namespace std;
+using namespace sf;
+
+// Initializing Dimensions.
+// Resolution X and Resolution Y determine the rendering resolution.
+// Remember (0,0) is the top left corner
+
+const int resolutionX = 960;
+const int resolutionY = 640;
+const int boxPixelsX = 32;
+const int boxPixelsY = 32;
+const int gameRows = resolutionY / boxPixelsY; // Total Rows on grid
+const int gameColumns = resolutionX / boxPixelsX; // Total Columns on grid
+
+// Add these constants near the other dimension constants at the top
+const int beeSpriteWidth = 32;
+const int beeSpriteHeight = 32;
+
+// Initializing GameGrid.
+int gameGrid[gameRows][gameColumns] = { 0 };
+// PLayer is spraycan
+// Function Declarations
+void drawPlayer(RenderWindow& window, float& player_x, float& player_y, Sprite& playerSprite, Sprite& sprayLevelSprite, bool powerUpActive, int activePowerUp);
+void moveBullet(float& bullet_y, bool& bullet_exists, Clock& bulletClock);
+void drawBullet(RenderWindow& window, float& bullet_x, float& bullet_y, Sprite& bulletSprite);
+void spawnBee(int bee_x[], int bee_y[], bool bee_exists[], int bee_direction[], int& bee_spawned, Clock& spawnClock, int& lastSpawnTime, int maxBees);
+void drawBee(RenderWindow& window, int bee_x[], int bee_y[], Sprite& beeSprite, bool bee_exists[], int bee_direction[], int maxBees, bool bee_paused[], int bee_pause_timer[], Clock beePauseClocks[], int beeAnimFrame[], Clock beeAnimClocks[]);
+void drawHoneycomb(RenderWindow& window, float honeycomb_x[], float honeycomb_y[], Sprite& honeycombSprite, bool honeycomb_exists[], float prehoneycomb_x[], float prehoneycomb_y[], Sprite& prehoneycombSprite, bool prehoneycomb_exists[], int maxHoneycombs, int maxPreHoneycombs);
+void drawFastHoneycomb(RenderWindow& window, float fasthoneycomb_x[], float fasthoneycomb_y[], Sprite& fasthoneycombSprite, bool fasthoneycomb_exists[], int fastMaxHoneycombs);
+void collisonWithPreHoneycomb(RenderWindow& window, int bee_x[], int bee_y[], float prehoneycomb_x[], float prehoneycomb_y[], bool bee_exists[], int bee_direction[], int maxBees, bool prehoneycomb_exists[], float hive_x[], float hive_y[], int& hive_count, bool hive_exists[], int maxPreHoneycombs, int maxHives);
+void collisonWithHoneycomb(RenderWindow& window, int bee_x[], int bee_y[], float honeycomb_x[], float honeycomb_y[], bool bee_exists[], int bee_direction[], int maxBees, bool honeycomb_exists[], float hive_x[], float hive_y[], int& hive_count, bool hive_exists[], int maxHoneycombs, int maxHives);
+void collisonWithFastHoneycomb(RenderWindow& window, int bee_x[], int bee_y[], float fasthoneycomb_x[], float fasthoneycomb_y[], bool bee_exists[], int bee_direction[], int maxBees, bool fasthoneycomb_exists[], float hive_x[], float hive_y[], int& hive_count, bool hive_exists[], int fastMaxHoneycombs, int maxHives);
+void collisonWithHive(RenderWindow& window, int bee_x[], int bee_y[], float hive_x[], float hive_y[], bool bee_exists[], int bee_direction[], int maxBees, bool hive_exists[]);
+void collisonWithPreHive(RenderWindow& window, int bee_x[], int bee_y[], float prehive_x[], float prehive_y[], bool bee_exists[], int bee_direction[], int maxBees, bool prehive_exists[]);
+void collisonWithBullets(int bee_x[], int bee_y[], bool& bullet_exists, bool bee_exists[], float bullet_x, float bullet_y, int maxBees, Sound& sound, float honeycomb_x[], float honeycomb_y[], bool honeycomb_exists[], int maxHoneycombs, float prehoneycomb_x[], float prehoneycomb_y[], bool prehoneycomb_exists[], int maxPreHoneycombs, int& playerScore, float hive_x[], float hive_y[], bool hive_exists[], float prehive_x[], float prehive_y[], bool prehive_exists[], int maxPreHive, int fastmaxBees, float fasthoneycomb_x[], float fasthoneycomb_y[], bool fasthoneycomb_exists[], int fastMaxHoneycombs, bool fastBee_exists[], int fastBee_x[], int fastBee_y[], int maxPowerUps, int powerUpType[], float powerUpX[], float powerUpY[], bool powerUpExists[], Clock powerUpDropClock[]);
+void spawnFastFlower(RenderWindow& window, int fastBee_x[], int fastBee_y[], int gameGrid[20][30], Sprite flowerSprites[], int& flowerCount, Texture& flowerTexture, int fastmaxBees, bool fastBee_exists[], bool flower_exists[], int& playerGridX, bool& firstleft, bool& firstright, int maxFlowers);
+void spawnFlower(RenderWindow& window, int bee_x[], int bee_y[], int gameGrid[20][30], Sprite flowerSprites[], int& flowerCount, Texture& flowerTexture, int maxBees, bool bee_exists[], bool flower_exists[], int& playerGridX, bool& firstleft, bool& firstright, int maxFlowers);
+void drawbird(RenderWindow& window, float bird_x, float bird_y, Sprite& birdSprite, bool bird_exists, int bird_direction_x, int bird_direction_y, Clock& bird_clock);
+void movebird(float& bird_x, float& bird_y, Clock& bird_pause_clock, int& bird_pause_timer, bool& bird_exists, bool& bird_paused, int& bird_direction_x, int& bird_direction_y);
+void spawnbird(bool& bird_exists, Clock& bird_clock, float& bird_x, float& bird_y);
+void hummingbirdInteractWithHoneycomb(float& bird_x, float& bird_y, bool& bird_exists, bool& bird_paused, Clock& bird_pause_clock, int& bird_pause_timer, float honeycomb_x[], float honeycomb_y[], bool honeycomb_exists[], float prehoneycomb_x[], float prehoneycomb_y[], bool prehoneycomb_exists[], int maxHoneycombs, int maxPreHoneycombs, int& playerScore, int maxPowerUps, int powerUpType[], float powerUpX[], float powerUpY[], bool powerUpExists[], Clock powerUpDropClock[]);
+void hummingbirdInteractWithRedHoneycomb(float& bird_x, float& bird_y, bool& bird_exists, bool& bird_paused, Clock& bird_pause_clock, int& bird_pause_timer, float fasthoneycomb_x[], float fasthoneycomb_y[], bool fasthoneycomb_exists[], int fastMaxHoneycombs, int& playerScore, int maxPowerUps, int powerUpType[], float powerUpX[], float powerUpY[], bool powerUpExists[], Clock powerUpDropClock[]);
+void handleHummingbirdCollision(float& bird_x, float& bird_y, bool& bullet_exists, bool& bird_exists, float bullet_x, float bullet_y, Sound& sound, int& bird_health, int& bird_hit_count, float& respawn_timer, Clock& respawn_clock, Sprite& birdSprite);
+void drawHives(RenderWindow& window, Sprite hiveSprites[], bool hive_exists[], float hive_x[], float hive_y[], int hive_count, float prehive_x[], float prehive_y[], Sprite& prehiveSprite, bool prehive_existsa[], int maxPreHive);
+void spawnFastBee(int fastBee_x[], int fastBee_y[], bool fastBee_exists[], int fastBee_direction[], int& fastBee_spawned, Clock& fastspawnClock, int& fastlastSpawnTime, int fastmaxBees);
+int mainMenu(RenderWindow& window, int highscores[], string playerNames[]);
+void drawFastBee(RenderWindow& window, int fastBee_x[], int fastBee_y[], Sprite& fastBeeSprite, bool fastBee_exists[], int fastBee_direction[], int fastmaxBees, bool fastBee_paused[], int fastBee_pause_timer[], Clock fastBeePauseClocks[]);
+bool checklevel(int bee_spawned, int maxBees, bool bee_exists[]);
+int startGame(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]);
+int level1(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]);
+int level2(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]);
+int level3(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]);
+int level4(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]);
+void readhighscores(int highscores[], string playerNames[]);
+void writeHighScores(int highscores[], string playerNames[]);
+void updateHighScores(int& playerScore, int highscores[], string playerNames[], RenderWindow& window);
+int displayHighScores(RenderWindow& window, int highscores[], string playerNames[]);
+
+int main() {
+    // Declaring RenderWindow
+    RenderWindow window(VideoMode(resolutionX, resolutionY), "Buzz Bombers", Style::Close | Style::Titlebar);
+    int playerScore = 0;
+    int bullet_counter = 0;
+    bool nextlevel = false;
+
+
+    const int maxhighscores = 10;
+    int highscores[maxhighscores];
+    string playerNames[maxhighscores];
+    readhighscores(highscores, playerNames);
+
+    while (window.isOpen()) {
+        int choice = mainMenu(window, highscores, playerNames);
+
+        if (choice == 1) {
+            playerScore = 0;
+            bullet_counter = 0;
+            nextlevel = false;
+            startGame(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+
+        }
+        if (choice == 2) {
+            playerScore = 0;
+            bullet_counter = 0;
+            nextlevel = false;
+            level1(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+        }
+        if (choice == 3) {
+            if (!nextlevel) {
+
+                playerScore = 0;
+                bullet_counter = 0;
+                nextlevel = false;
+            }
+            level2(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+        }
+        if (choice == 4) {
+            if (!nextlevel) {
+                playerScore = 0;
+                bullet_counter = 0;
+                nextlevel = false;
+            }
+            level3(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+        }
+        if (choice == 5) {
+            if (!nextlevel) {
+                playerScore = 0;
+                bullet_counter = 0;
+                nextlevel = false;
+            }
+            level4(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+        }
+        if (choice == 6) {
+            displayHighScores(window, highscores, playerNames);
+        }
+        if (choice == 7) {
+            window.close();
+        }
+
+    }
+
+    return 0;
+}
+
+
+int mainMenu(RenderWindow& window, int highscores[], string playerNames[]) {
+    // Load font
+    Font font;
+    if (!font.loadFromFile("Fonts/Roboto-BlackItalic.ttf")) {
+        cout << "Error loading font!" << endl;
+        return 7;
+    }
+
+    // Title setup
+    Text titleText;
+    titleText.setFont(font);
+    titleText.setString("Buzz Bombers");
+    titleText.setCharacterSize(60);
+    titleText.setFillColor(Color::Yellow);
+    titleText.setPosition((resolutionX - 400) / 2, 50);
+
+    // Menu items
+    Text menuItems[7];
+    string menuStrings[] = { "Start Game", "Level 1", "Level 2", "Level 3", "Level 4", "High Score", "Exit" };
+    int menuYStart = 200, menuSpacing = 60;
+
+    for (int i = 0; i < 7; i++) {
+        menuItems[i].setFont(font);
+        menuItems[i].setString(menuStrings[i]);
+        menuItems[i].setCharacterSize(40);
+        menuItems[i].setFillColor(Color::White); // Default color
+        float menuX = (resolutionX - menuStrings[i].length() * 20.0f) / 2; // Roughly center
+        float menuY = menuYStart + i * menuSpacing;
+        menuItems[i].setPosition(menuX, menuY);
+    }
+
+
+    int currentSelection = 0;
+    menuItems[currentSelection].setFillColor(Color::Yellow);
+
+    // Menu loop
+    while (window.isOpen()) {
+        Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == Event::Closed) {
+                window.close();
+                return 7; // Exit on window close
+            }
+
+            if (event.type == Event::KeyPressed) {
+                // Navigate up
+                if (event.key.code == Keyboard::Up) {
+                    menuItems[currentSelection].setFillColor(Color::White); // Reset previous selection
+                    currentSelection = (currentSelection - 1 + 7) % 7; // Move up (wrap around)
+                    menuItems[currentSelection].setFillColor(Color::Yellow); // Highlight new selection
+                }
+                // Navigate down
+                else if (event.key.code == Keyboard::Down) {
+                    menuItems[currentSelection].setFillColor(Color::White); // Reset previous selection
+                    currentSelection = (currentSelection + 1) % 7; // Move down (wrap around)
+                    menuItems[currentSelection].setFillColor(Color::Yellow); // Highlight new selection
+                }
+                // Confirm selection
+                else if (event.key.code == Keyboard::Enter) {
+                    return currentSelection + 1;
+                }
+            }
+        }
+
+        // Render menu
+        window.clear(Color::Black);
+        window.draw(titleText);
+        for (int i = 0; i < 7; i++) {
+            window.draw(menuItems[i]);
+        }
+        window.display();
+    }
+
+    return 7;
+}
+
+
+bool backToMainMenu(RenderWindow& window) {
+    Event event;
+    while (window.pollEvent(event)) {
+        if (event.type == Event::Closed) {
+            window.close();
+            return false;
+        }
+        if (event.type == Event::KeyPressed && event.key.code == Keyboard::Escape) {
+            return true;
+        }
+    }
+    return false; // Stay in the current level
+}
+
+int startGame(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]) {
+
+    srand(time(0));
+    // reseting
+    for (int i = 0; i < gameRows; i++) {
+        for (int j = 0; j < gameColumns; j++) {
+            gameGrid[i][j] = 0;
+        }
+    }
+    bool levelComplete = false;
+    // Background texture and background sprite
+    Texture background1Texture;
+    Sprite background1Sprite;
+    background1Texture.loadFromFile("Textures/background1.png");
+    background1Sprite.setTexture(background1Texture);
+    background1Sprite.setScale(4, 3);
+    // Loading the font
+    Font font;
+    font.loadFromFile("Fonts/Roboto-BlackItalic.ttf");
+    // Displaying Score
+    Text scoreText;
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(32);
+    scoreText.setFillColor(Color::Black);
+    scoreText.setPosition(850, 585);
+    // Displaying Game Over
+    Text gameOverText;
+    gameOverText.setFont(font);
+    gameOverText.setString("Game Over");
+    gameOverText.setCharacterSize(60);
+    gameOverText.setFillColor(Color::Red);
+    gameOverText.setStyle(Text::Bold);
+    gameOverText.setPosition(320, 200);
+    // Game over message
+    Text gameOver2Text;
+    gameOver2Text.setFont(font);
+    gameOver2Text.setString("Press SPACE to return to Main Menu");
+    gameOver2Text.setCharacterSize(40);
+    gameOver2Text.setFillColor(Color::Black);
+    gameOver2Text.setPosition(100, 300);
+
+    // Display can1's spray left
+    int can1 = 56;
+    Text can1Text;
+    can1Text.setFont(font);
+    can1Text.setCharacterSize(32);
+    can1Text.setFillColor(Color::Black);
+    can1Text.setPosition(200, 585);
+    // Display can2's spray left
+    int can2 = 56;
+    Text can2Text;
+    can2Text.setFont(font);
+    can2Text.setCharacterSize(32);
+    can2Text.setFillColor(Color::Black);
+    can2Text.setPosition(200, 585);
+    // Display can3's spray left
+    int can3 = 56;
+    Text can3Text;
+    can3Text.setFont(font);
+    can3Text.setCharacterSize(32);
+    can3Text.setFillColor(Color::Black);
+    can3Text.setPosition(200, 585);
+
+
+
+    // Initializing Background Music
+    Music bgMusic;
+    if (!bgMusic.openFromFile("Music/Music3.ogg")) {
+        cout << "Error: Could not load music file!" << endl;
+    }
+    bgMusic.setVolume(50);
+    bgMusic.setLoop(true);
+    bgMusic.play();
+
+    // Sound for collison of bees
+
+    SoundBuffer buffer;
+    if (!buffer.loadFromFile("Sound Effects/hit.wav")) {
+        cout << "Error loading collison sound" << endl;
+        return -1;
+    }
+    // Creating a sound object and linking it to the buffer
+    Sound sound;
+    sound.setBuffer(buffer);
+    // Initializing Player's Location
+
+    int playerGridX = gameColumns / 2; // Horizontal position of player depends on columns : 30 / 2 = 15
+    int playerGridY = gameRows - 4;    // Vertical position of player depends on rows: 20 - 4 = 16
+
+    float player_x = playerGridX * boxPixelsX;// 15 * 32 = 480 which is in the middle of the screen (960 / 2 is also 480)
+    float player_y = playerGridY * boxPixelsY;// 16 * 32 = 512 and it places the player verticaly at 512 y coordinate
+
+    // Player texture and player sprite
+    Texture playerTexture; // Making an object of class Texture
+    Sprite playerSprite; // Making an object of class sprite
+    playerTexture.loadFromFile("Textures/spray.png"); // Loading the texture from the file
+    playerSprite.setTexture(playerTexture); // Putting texture
+    // Spray can level
+    Texture sprayLevelTexture;
+    Sprite sprayLevelSprite;
+    sprayLevelTexture.loadFromFile("Textures/sprayLevel.png");
+    sprayLevelSprite.setTexture(sprayLevelTexture);
+
+    // Scoring
+
+    char scoreBuffer[10];
+
+    // Ammo texture and ammo sprite
+    Texture ammoTexture;
+    Sprite ammoSprite1;  // First ammo
+    Sprite ammoSprite2;  // Second ammo
+    ammoTexture.loadFromFile("Textures/spray.png");
+    ammoSprite1.setTexture(ammoTexture);
+    ammoSprite2.setTexture(ammoTexture);
+    ammoSprite1.setPosition(10, 570);
+    ammoSprite2.setPosition(60, 570);
+
+    // Initializing Honeycombs
+    float honeycomb_x[20] = { 0 };
+    float honeycomb_y[20] = { 0 };
+    bool honeycomb_exists[20] = { false };
+    Texture honeycombTexture;
+    Sprite honeycombSprite;
+    honeycombTexture.loadFromFile("Textures/honeycomb.png");
+    honeycombSprite.setTexture(honeycombTexture);
+    const int maxHoneycombs = 20;
+    //3 pregenerated Honeycombs
+    float prehoneycomb_x[3] = { 0 };
+    float prehoneycomb_y[3] = { 0 };
+    Texture prehoneycombTexture;
+    Sprite prehoneycombSprite;
+    prehoneycombTexture.loadFromFile("Textures/honeycomb.png");
+    prehoneycombSprite.setTexture(honeycombTexture);
+    const int maxPreHoneycombs = 3;
+    bool prehoneycomb_exists[maxPreHoneycombs] = { true, true, true };
+    // red honey combs
+    float fasthoneycomb_x[5] = { 0 };
+    float fasthoneycomb_y[5] = { 0 };
+    bool fasthoneycomb_exists[5] = { false };
+    Texture fasthoneycombTexture;
+    Sprite fasthoneycombSprite;
+    fasthoneycombTexture.loadFromFile("Textures/honeycomb_red.png");
+    fasthoneycombSprite.setTexture(fasthoneycombTexture);
+    const int fastMaxHoneycombs = 5;
+    // Giving them random values
+    for (int i = 0; i < maxPreHoneycombs; i++) {
+        prehoneycomb_x[i] = rand() % (resolutionX - boxPixelsX - 200) + 100;
+        prehoneycomb_y[i] = rand() % (resolutionY / 2 - boxPixelsY); //Dont want them to spawn at lower half
+
+    }
+
+
+
+
+    // Initializing Bullet and Bullet Sprites
+    float bullet_x = player_x;
+    float bullet_y = player_y;
+    bool bullet_exists = false;
+    // For counting the number of bullets and will be used for ammo purposes
+
+    Clock bulletClock;
+    Texture bulletTexture;
+    Sprite bulletSprite;
+    bulletTexture.loadFromFile("Textures/bullet.png");
+    bulletSprite.setTexture(bulletTexture);
+    bulletSprite.setScale(1, 1);
+    bulletSprite.setTextureRect(IntRect(0, 0, boxPixelsX, boxPixelsY)); // This allows us to specify the part of texture that we are using (used for handling sprite sheets)
+
+    //Flowers Texture and Sprite
+
+    const int maxFlowers = 22;
+    Sprite flowerSprites[maxFlowers];
+    Texture flowerTexture;
+    flowerTexture.loadFromFile("Textures/obstacles.png");
+    int flowerCount = 0;
+    bool flower_exists[22] = { false };
+    static bool firstleft = true;
+    static bool firstright = true;
+
+
+
+
+    // The ground on which the player moves
+    RectangleShape groundRectangle(Vector2f(960, 64));// 960 is the width and 64 is the height
+    groundRectangle.setPosition(0, (gameRows - 2) * boxPixelsY);
+    groundRectangle.setFillColor(Color::Green);
+    // Bees
+    const int maxBees = 20;
+    int allBees = 20;
+    int bee_x[maxBees] = { false }, bee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool bee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int bee_direction[maxBees] = { 1 };  // 1 for right, -1 for left
+    int bee_spawned = 0;   // counter for number of bees
+    int lastSpawnTime = 0; // last spawning time of bee
+    Clock spawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock beePauseClocks[maxBees];
+    bool bee_paused[maxBees] = { false };
+    int bee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture beeTexture;
+    Sprite beeSprite;
+    beeTexture.loadFromFile("Textures/Regular_bee.png");
+    beeSprite.setTexture(beeTexture);
+    
+
+    //Fast Bees
+    const int fastmaxBees = 0;   // For Level 1
+    int fastBee_x[maxBees] = { false };
+    int fastBee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool fastBee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int fastBee_direction[maxBees] = { 0 };  // 1 for right, -1 for left
+    int fastBee_spawned = 0;   // counter for number of bees
+    int fastlastSpawnTime = 0; // last spawning time of bee
+    Clock fastspawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock fastBeePauseClocks[maxBees];
+    bool fastBee_paused[maxBees] = { false };
+    int fastBee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture fastBeeTexture;
+    Sprite fastBeeSprite;
+    fastBeeTexture.loadFromFile("Textures/Fast_bee.png");
+    fastBeeSprite.setTexture(fastBeeTexture);
+
+    // Beehives
+    float hive_x[23] = { 0 };
+    float hive_y[23] = { 0 };
+    int hive_count = 0;
+    bool hive_exists[23] = { false };
+    const int maxHives = 23;
+    Texture hiveTexture;
+    Sprite hiveSprites[maxHives];
+    hiveTexture.loadFromFile("Textures/hive.png");
+    for (int i = 0; i < maxHives; i++) {
+        hiveSprites[i].setTexture(hiveTexture);
+    }
+
+    float prehive_x[5] = { 0 };
+    float prehive_y[5] = { 0 };
+    Texture prehiveTexture;
+    Sprite prehiveSprite;
+    prehiveTexture.loadFromFile("Textures/hive.png");
+    prehiveSprite.setTexture(prehiveTexture);
+    const int maxPreHive = 5;
+    bool prehive_exists[maxPreHive] = { true,true,true,true,true };
+
+
+
+
+
+
+    // Humming Bird
+    float bird_x;
+    float bird_y;
+    bool bird_exists = false;
+    int bird_direction_x = 0;
+    int bird_direction_y = 0;
+    int bird_health = 3;
+    bool bird_paused = false;
+    Clock bird_clock;
+    int bird_pause_timer;
+    Clock bird_pause_clock;
+    int bird_movement_counter = 0;
+    Clock respawn_clock;
+    int bird_hit_count = 0;
+    float respawn_timer;
+
+    // Hummingbird Texture and Sprite
+    Texture birdTexture;
+    Sprite birdSprite;
+    birdTexture.loadFromFile("Textures/bird.png");
+    birdSprite.setTexture(birdTexture);
+    birdSprite.setScale(2, 2);
+
+    // Declaring the clock for movement
+    Clock movementClock;
+    Clock shootClock;
+    int beeAnimFrame[maxBees] = { 0 };
+    Clock beeAnimClocks[maxBees];
+    
+    int maxPowerUps = 10;
+    int powerUpType[10];
+    float powerUpX[10];
+    float powerUpY[10];
+    bool powerUpExists[10];
+    Clock powerUpDropClock[10];
+
+    int activePowerUp = 0;
+    Clock powerUpEffectClock;
+    float powerUpDuration = 5.0;
+    bool powerUpActive = false;
+
+    Texture speedUpTexture, speedDownTexture, heightUpTexture, heightDownTexture;
+    speedUpTexture.loadFromFile("Textures/speed_Inc.png");
+    speedDownTexture.loadFromFile("Textures/speed_Dec.png");
+    heightUpTexture.loadFromFile("Textures/height_Inc.png");
+    heightDownTexture.loadFromFile("Textures/height_Dec.png");
+    Sprite speedUpSprite;
+    Sprite speedDownSprite;
+    Sprite heightUpSprite;
+    Sprite heightDownSprite;
+
+    while (window.isOpen()) {
+        if (backToMainMenu(window)) {
+            return 0;  // Return to Main Menu
+        }
+        //Drawing background
+        window.draw(background1Sprite);
+        // Movement in grid
+        if (movementClock.getElapsedTime().asMilliseconds() > 100) { // Delay of 0.1 sec
+            // For left movement
+            if (Keyboard::isKeyPressed(Keyboard::Left) && playerGridX > 0 && gameGrid[playerGridY][playerGridX - 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX--; // Move left
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            // For right movement
+            else if (Keyboard::isKeyPressed(Keyboard::Right) && playerGridX < gameColumns - 1 && gameGrid[playerGridY][playerGridX + 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX++; // Move right
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            movementClock.restart(); // Reset clock
+        }
+
+        if ((gameGrid[playerGridY][playerGridX - 1] == 2) && (gameGrid[playerGridY][playerGridX + 1] == 2)) {
+
+            // Jumping
+            for (int i = 0; i < gameColumns; i++) {
+                if (playerGridX - i >= 0 && gameGrid[playerGridY][playerGridX - i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX - i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+                if (playerGridX + i < gameColumns && gameGrid[playerGridY][playerGridX + i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX + i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+
+            }
+        }
+
+
+
+
+        //cout<<gameGrid[16][15]<<endl;
+        //cout<<gameGrid[16][14]<<endl;
+        //cout<<gameGrid[16][16]<<endl;
+        //cout<<"player x"<<player_x<<endl;
+        //cout<<"player y"<<player_y<<endl;
+
+        // For shooting
+        if (shootClock.getElapsedTime().asMilliseconds() > 500) {
+            if (Keyboard::isKeyPressed(Keyboard::Space) && !bullet_exists) {
+                bullet_exists = true;
+                // Positioning of bullet along x and y axis
+                bullet_x = player_x + boxPixelsX / 2; // Positioning the bullet with the center of spray can
+                bullet_y = player_y;
+                bullet_counter++; // Incrementing the counter each time the bullet is fired
+                if (bullet_counter <= 56) {
+                    can1--;
+                }
+                if (bullet_counter > 57 && bullet_counter <= 112) {
+                    can2--;
+                }
+                if (bullet_counter > 113 && bullet_counter <= 169) {
+                    can3--;
+                }
+
+
+
+
+
+
+                shootClock.restart(); // Reset clock
+            }
+        }
+        // Update player position in pixels
+        player_x = playerGridX * boxPixelsX;
+        player_y = playerGridY * boxPixelsY;
+
+
+
+
+        collisonWithBullets(bee_x, bee_y, bullet_exists, bee_exists, bullet_x, bullet_y, maxBees, sound, honeycomb_x, honeycomb_y, honeycomb_exists, maxHoneycombs, prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists, maxPreHoneycombs, playerScore, hive_x, hive_y, hive_exists, prehive_x, prehive_y, prehive_exists, maxPreHive, fastmaxBees, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, fastBee_exists, fastBee_x, fastBee_y, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        // Collision with Prehoneycombs
+        collisonWithPreHoneycomb(window, bee_x, bee_y, prehoneycomb_x, prehoneycomb_y, bee_exists, bee_direction, maxBees, prehoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxPreHoneycombs, maxHives);
+        // Collision with honeycombs
+        collisonWithHoneycomb(window, bee_x, bee_y, honeycomb_x, honeycomb_y, bee_exists, bee_direction, maxBees, honeycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxHoneycombs, maxHives);
+        // collision with hives
+        collisonWithHive(window, bee_x, bee_y, hive_x, hive_y, bee_exists, bee_direction, maxBees, hive_exists);
+
+        // Calling drawHoneycomb function
+        drawHoneycomb(window, honeycomb_x, honeycomb_y, honeycombSprite, honeycomb_exists, prehoneycomb_x, prehoneycomb_y, prehoneycombSprite, prehoneycomb_exists, maxHoneycombs, maxPreHoneycombs);
+
+
+        // Calling spawnBee function
+        spawnBee(bee_x, bee_y, bee_exists, bee_direction, bee_spawned, spawnClock, lastSpawnTime, maxBees);
+        drawBee(window, bee_x, bee_y, beeSprite, bee_exists, bee_direction, maxBees, bee_paused, bee_pause_timer, beePauseClocks, beeAnimFrame, beeAnimClocks);
+
+        // Draw Humming bird
+        spawnbird(bird_exists, bird_clock, bird_x, bird_y);
+        drawbird(window, bird_x, bird_y, birdSprite, bird_exists, bird_direction_x, bird_direction_y, bird_clock);
+        movebird(bird_x, bird_y, bird_pause_clock, bird_pause_timer, bird_exists, bird_paused, bird_direction_x, bird_direction_y);
+        hummingbirdInteractWithHoneycomb(
+            bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer,
+            honeycomb_x, honeycomb_y, honeycomb_exists,
+            prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists,
+            maxHoneycombs, maxPreHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        handleHummingbirdCollision(bird_x, bird_y, bullet_exists, bird_exists, bullet_x, bullet_y, sound, bird_health, bird_hit_count, respawn_timer, respawn_clock, birdSprite);
+
+
+        // Calling beehive function
+
+
+        if (bullet_exists) {
+            moveBullet(bullet_y, bullet_exists, bulletClock);
+            drawBullet(window, bullet_x, bullet_y, bulletSprite);
+        }
+        else {
+
+            bullet_x = player_x;
+            bullet_y = player_y;
+        }
+
+        // Calling drawPlayer function
+        drawPlayer(window, player_x, player_y, playerSprite, sprayLevelSprite, powerUpActive, activePowerUp);
+
+
+
+        window.draw(groundRectangle);// Order is important
+        // Showing spray cans
+        if (bullet_counter <= 56) {
+            window.draw(ammoSprite2); // Drawing Ammo1
+
+
+        }
+        if (bullet_counter <= 112) {
+            window.draw(ammoSprite1); // Drawing Ammo2
+
+        }
+        if (bullet_counter > 56 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 0;
+        }
+        if (bullet_counter > 112 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 57;
+        }
+
+
+        // Displaying Score
+        scoreText.setString(to_string(playerScore));
+        window.draw(scoreText);
+
+        // Displaying Spray left
+        can1Text.setString("Spray Left: " + to_string(can1));
+        can2Text.setString("Spray Left: " + to_string(can2));
+        can3Text.setString("Spray Left: " + to_string(can3));
+
+        if (bullet_counter <= 56) {
+            window.draw(can1Text);
+        }
+        if (bullet_counter > 56 && bullet_counter <= 112) {
+            window.draw(can2Text);
+        }
+        if (bullet_counter > 112) {
+            window.draw(can3Text);
+        }
+
+
+        // Decreases the level after every 8 bullets are fired
+        if (bullet_counter == 0) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 8) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 16) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 24) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 32) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 40) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 48) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 56) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        if (bullet_counter == 57) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 65) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 73) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 81) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 89) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 97) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 105) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+
+        if (bullet_counter == 106) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 114) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 122) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 130) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 138) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 146) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 154) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 162) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        // Spawning Flowers
+        spawnFlower(window, bee_x, bee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, maxBees, bee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+
+        // Drawing Flowers
+        for (int i = 0; i < flowerCount; i++) {
+            if (flower_exists[i]) {
+                window.draw(flowerSprites[i]);
+            }
+        }
+        bool levelComplete = checklevel(bee_spawned, maxBees, bee_exists);
+        if (levelComplete) {
+            for (int i = 0; i < maxHives; i++) {
+                if (hive_exists[i]) {
+                    if (hive_y[i] >= 0 && hive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (hive_y[i] >= 64 && hive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (hive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+            for (int i = 0; i < maxPreHive; i++) {
+                if (prehive_exists[i]) {
+                    if (prehive_y[i] >= 0 && prehive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (prehive_y[i] >= 64 && prehive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (prehive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+
+            nextlevel = true;
+            bgMusic.stop();
+            level2(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+
+        }
+
+        if (can3 == 0 || (flowerCount > 20)) {
+            updateHighScores(playerScore, highscores, playerNames, window);
+            playerScore = 0;
+            bullet_counter = 0;
+            nextlevel = false;
+
+            return 0;
+
+        }
+
+
+
+        window.display(); // Displays everything that was added by window.draw()
+        window.clear(); // Clears everything from the frame so that there is no overlapping of content in the next frame
+    }
+    return 0;
+}
+
+
+
+
+
+// level 1
+int level1(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]) {
+
+    srand(time(0));
+    // reseting
+    for (int i = 0; i < gameRows; i++) {
+        for (int j = 0; j < gameColumns; j++) {
+            gameGrid[i][j] = 0;
+        }
+    }
+    // Background texture and background sprite
+    Texture background1Texture;
+    Sprite background1Sprite;
+    background1Texture.loadFromFile("Textures/background1.png");
+    background1Sprite.setTexture(background1Texture);
+    background1Sprite.setScale(4, 3);
+    // Loading the font
+    Font font;
+    font.loadFromFile("Fonts/Roboto-BlackItalic.ttf");
+    // Displaying Score
+    Text scoreText;
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(32);
+    scoreText.setFillColor(Color::Black);
+    scoreText.setPosition(850, 585);
+    // Displaying Game Over
+    Text gameOverText;
+    gameOverText.setFont(font);
+    gameOverText.setString("Game Over");
+    gameOverText.setCharacterSize(60);
+    gameOverText.setFillColor(Color::Red);
+    gameOverText.setStyle(Text::Bold);
+    gameOverText.setPosition(320, 200);
+    Text gameOver2Text;
+    gameOver2Text.setFont(font);
+    gameOver2Text.setString("Press SPACE to return to Main Menu");
+    gameOver2Text.setCharacterSize(40);
+    gameOver2Text.setFillColor(Color::Black);
+    gameOver2Text.setPosition(100, 300);
+    // Display can1's spray left
+    int can1 = 56;
+    Text can1Text;
+    can1Text.setFont(font);
+    can1Text.setCharacterSize(32);
+    can1Text.setFillColor(Color::Black);
+    can1Text.setPosition(200, 585);
+    // Display can2's spray left
+    int can2 = 56;
+    Text can2Text;
+    can2Text.setFont(font);
+    can2Text.setCharacterSize(32);
+    can2Text.setFillColor(Color::Black);
+    can2Text.setPosition(200, 585);
+    // Display can3's spray left
+    int can3 = 56;
+    Text can3Text;
+    can3Text.setFont(font);
+    can3Text.setCharacterSize(32);
+    can3Text.setFillColor(Color::Black);
+    can3Text.setPosition(200, 585);
+
+
+
+    // Initializing Background Music
+    Music bgMusic;
+    if (!bgMusic.openFromFile("Music/Music3.ogg")) {
+        cout << "Error: Could not load music file!" << endl;
+    }
+    bgMusic.setVolume(50);
+    bgMusic.setLoop(true);
+    bgMusic.play();
+
+    // Sound for collison of bees
+
+    SoundBuffer buffer;
+    if (!buffer.loadFromFile("Sound Effects/hit.wav")) {
+        cout << "Error loading collison sound" << endl;
+        return -1;
+    }
+    // Creating a sound object and linking it to the buffer
+    Sound sound;
+    sound.setBuffer(buffer);
+    // Initializing Player's Location
+
+    int playerGridX = gameColumns / 2; // Horizontal position of player depends on columns : 30 / 2 = 15
+    int playerGridY = gameRows - 4;    // Vertical position of player depends on rows: 20 - 4 = 16
+
+    float player_x = playerGridX * boxPixelsX;// 15 * 32 = 480 which is in the middle of the screen (960 / 2 is also 480)
+    float player_y = playerGridY * boxPixelsY;// 16 * 32 = 512 and it places the player verticaly at 512 y coordinate
+
+    // Player texture and player sprite
+    Texture playerTexture; // Making an object of class Texture
+    Sprite playerSprite; // Making an object of class sprite
+    playerTexture.loadFromFile("Textures/spray.png"); // Loading the texture from the file
+    playerSprite.setTexture(playerTexture); // Putting texture
+    // Spray can level
+    Texture sprayLevelTexture;
+    Sprite sprayLevelSprite;
+    sprayLevelTexture.loadFromFile("Textures/sprayLevel.png");
+    sprayLevelSprite.setTexture(sprayLevelTexture);
+
+    // Scoring
+
+    char scoreBuffer[10];
+
+    // Ammo texture and ammo sprite
+    Texture ammoTexture;
+    Sprite ammoSprite1;  // First ammo
+    Sprite ammoSprite2;  // Second ammo
+    ammoTexture.loadFromFile("Textures/spray.png");
+    ammoSprite1.setTexture(ammoTexture);
+    ammoSprite2.setTexture(ammoTexture);
+    ammoSprite1.setPosition(10, 570);
+    ammoSprite2.setPosition(60, 570);
+
+    // Initializing Honeycombs
+    float honeycomb_x[20] = { 0 };
+    float honeycomb_y[20] = { 0 };
+    bool honeycomb_exists[20] = { false };
+    Texture honeycombTexture;
+    Sprite honeycombSprite;
+    honeycombTexture.loadFromFile("Textures/honeycomb.png");
+    honeycombSprite.setTexture(honeycombTexture);
+    const int maxHoneycombs = 20;
+    //3 pregenerated Honeycombs
+    float prehoneycomb_x[3] = { 0 };
+    float prehoneycomb_y[3] = { 0 };
+    Texture prehoneycombTexture;
+    Sprite prehoneycombSprite;
+    prehoneycombTexture.loadFromFile("Textures/honeycomb.png");
+    prehoneycombSprite.setTexture(honeycombTexture);
+    const int maxPreHoneycombs = 3;
+    bool prehoneycomb_exists[maxPreHoneycombs] = { true, true, true };
+    // red honey combs
+    float fasthoneycomb_x[5] = { 0 };
+    float fasthoneycomb_y[5] = { 0 };
+    bool fasthoneycomb_exists[5] = { false };
+    Texture fasthoneycombTexture;
+    Sprite fasthoneycombSprite;
+    fasthoneycombTexture.loadFromFile("Textures/honeycomb_red.png");
+    fasthoneycombSprite.setTexture(fasthoneycombTexture);
+    const int fastMaxHoneycombs = 5;
+    // Giving them random values
+    for (int i = 0; i < maxPreHoneycombs; i++) {
+        prehoneycomb_x[i] = rand() % (resolutionX - boxPixelsX - 200) + 100;
+        prehoneycomb_y[i] = rand() % (resolutionY / 2 - boxPixelsY); //Dont want them to spawn at lower half
+
+    }
+
+
+
+
+    // Initializing Bullet and Bullet Sprites
+    float bullet_x = player_x;
+    float bullet_y = player_y;
+    bool bullet_exists = false;
+
+
+    Clock bulletClock;
+    Texture bulletTexture;
+    Sprite bulletSprite;
+    bulletTexture.loadFromFile("Textures/bullet.png");
+    bulletSprite.setTexture(bulletTexture);
+    bulletSprite.setScale(1, 1);
+    bulletSprite.setTextureRect(IntRect(0, 0, boxPixelsX, boxPixelsY)); // This allows us to specify the part of texture that we are using (used for handling sprite sheets)
+
+    //Flowers Texture and Sprite
+
+    const int maxFlowers = 22;
+    Sprite flowerSprites[maxFlowers];
+
+    Texture flowerTexture;
+    flowerTexture.loadFromFile("Textures/obstacles.png");
+
+    int flowerCount = 0;
+    bool flower_exists[22] = { false };
+    static bool firstleft = true;
+    static bool firstright = true;
+
+
+
+
+    // The ground on which the player moves
+    RectangleShape groundRectangle(Vector2f(960, 64));// 960 is the width and 64 is the height
+    groundRectangle.setPosition(0, (gameRows - 2) * boxPixelsY);
+    groundRectangle.setFillColor(Color::Green);
+    // Bees
+    const int maxBees = 20;   // For Level 1
+    int allBees = 20;
+    int bee_x[maxBees] = { false }, bee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool bee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int bee_direction[maxBees] = { 1 };  // 1 for right, -1 for left
+    int bee_spawned = 0;   // counter for number of bees
+    int lastSpawnTime = 0; // last spawning time of bee
+    Clock spawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock beePauseClocks[maxBees];
+    bool bee_paused[maxBees] = { false };
+    int bee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture beeTexture;
+    Sprite beeSprite;
+    beeTexture.loadFromFile("Textures/Regular_bee.png");
+    beeSprite.setTexture(beeTexture);
+
+    //Fast Bees
+    const int fastmaxBees = 0;   // For Level 1
+    int fastBee_x[maxBees] = { false };
+    int fastBee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool fastBee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int fastBee_direction[maxBees] = { 0 };  // 1 for right, -1 for left
+    int fastBee_spawned = 0;   // counter for number of bees
+    int fastlastSpawnTime = 0; // last spawning time of bee
+    Clock fastspawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock fastBeePauseClocks[maxBees];
+    bool fastBee_paused[maxBees] = { false };
+    int fastBee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture fastBeeTexture;
+    Sprite fastBeeSprite;
+    fastBeeTexture.loadFromFile("Textures/Fast_bee.png");
+    fastBeeSprite.setTexture(fastBeeTexture);
+
+    // Beehives
+    float hive_x[23] = { 0 };
+    float hive_y[23] = { 0 };
+    int hive_count = 0;
+    bool hive_exists[23] = { false };
+    const int maxHives = 23;
+    Texture hiveTexture;
+    Sprite hiveSprites[maxHives];
+    hiveTexture.loadFromFile("Textures/hive.png");
+    for (int i = 0; i < maxHives; i++) {
+        hiveSprites[i].setTexture(hiveTexture);
+    }
+
+    float prehive_x[5] = { 0 };
+    float prehive_y[5] = { 0 };
+    Texture prehiveTexture;
+    Sprite prehiveSprite;
+    prehiveTexture.loadFromFile("Textures/hive.png");
+    prehiveSprite.setTexture(prehiveTexture);
+    const int maxPreHive = 5;
+    bool prehive_exists[maxPreHive] = { true,true,true,true,true };
+
+
+
+
+
+
+    // Humming Bird
+    float bird_x;
+    float bird_y;
+    bool bird_exists = false;
+    int bird_direction_x = 0;
+    int bird_direction_y = 0;
+    int bird_health = 3;
+    bool bird_paused = false;
+    Clock bird_clock;
+    int bird_pause_timer;
+    Clock bird_pause_clock;
+    int bird_movement_counter = 0;
+    Clock respawn_clock;
+    int bird_hit_count = 0;
+    float respawn_timer;
+
+    // Hummingbird Texture and Sprite
+    Texture birdTexture;
+    Sprite birdSprite;
+    birdTexture.loadFromFile("Textures/bird.png");
+    birdSprite.setTexture(birdTexture);
+    birdSprite.setScale(2, 2);
+
+    // Declaring the clock for movement
+    Clock movementClock;
+    Clock shootClock;
+    int beeAnimFrame[maxBees] = { 0 };
+    Clock beeAnimClocks[maxBees];
+    
+    int maxPowerUps = 10;
+    int powerUpType[10];
+    float powerUpX[10];
+    float powerUpY[10];
+    bool powerUpExists[10];
+    Clock powerUpDropClock[10];
+
+    int activePowerUp = 0;
+    Clock powerUpEffectClock;
+    float powerUpDuration = 5.0;
+    bool powerUpActive = false;
+
+    Texture speedUpTexture, speedDownTexture, heightUpTexture, heightDownTexture;
+    speedUpTexture.loadFromFile("Textures/speed_Inc.png");
+    speedDownTexture.loadFromFile("Textures/speed_Dec.png");
+    heightUpTexture.loadFromFile("Textures/height_Inc.png");
+    heightDownTexture.loadFromFile("Textures/height_Dec.png");
+    Sprite speedUpSprite;
+    Sprite speedDownSprite;
+    Sprite heightUpSprite;
+    Sprite heightDownSprite;
+
+    while (window.isOpen()) {
+        if (backToMainMenu(window)) {
+            return 0;  // Return to Main Menu
+        }
+        //Drawing background
+        window.draw(background1Sprite);
+        // Movement in grid
+        if (movementClock.getElapsedTime().asMilliseconds() > 100) { // Delay of 0.1 sec
+            // For left movement
+            if (Keyboard::isKeyPressed(Keyboard::Left) && playerGridX > 0 && gameGrid[playerGridY][playerGridX - 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX--; // Move left
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            // For right movement
+            else if (Keyboard::isKeyPressed(Keyboard::Right) && playerGridX < gameColumns - 1 && gameGrid[playerGridY][playerGridX + 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX++; // Move right
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            movementClock.restart(); // Reset clock
+        }
+
+        if ((gameGrid[playerGridY][playerGridX - 1] == 2) && (gameGrid[playerGridY][playerGridX + 1] == 2)) {
+
+            // Jumping
+            for (int i = 0; i < gameColumns; i++) {
+                if (playerGridX - i >= 0 && gameGrid[playerGridY][playerGridX - i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX - i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+                if (playerGridX + i < gameColumns && gameGrid[playerGridY][playerGridX + i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX + i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+
+            }
+        }
+
+
+
+
+        //cout<<gameGrid[16][15]<<endl;
+        //cout<<gameGrid[16][14]<<endl;
+        //cout<<gameGrid[16][16]<<endl;
+        //cout<<"player x"<<player_x<<endl;
+        //cout<<"player y"<<player_y<<endl;
+
+        // For shooting
+        if (shootClock.getElapsedTime().asMilliseconds() > 500) {
+            if (Keyboard::isKeyPressed(Keyboard::Space) && !bullet_exists) {
+                bullet_exists = true;
+                // Positioning of bullet along x and y axis
+                bullet_x = player_x + boxPixelsX / 2; // Positioning the bullet with the center of spray can
+                bullet_y = player_y;
+                bullet_counter++; // Incrementing the counter each time the bullet is fired
+                if (bullet_counter <= 56) {
+                    can1--;
+                }
+                if (bullet_counter > 57 && bullet_counter <= 112) {
+                    can2--;
+                }
+                if (bullet_counter > 113 && bullet_counter <= 169) {
+                    can3--;
+                }
+
+
+
+
+
+
+                shootClock.restart(); // Reset clock
+            }
+        }
+        // Update player position in pixels
+        player_x = playerGridX * boxPixelsX;
+        player_y = playerGridY * boxPixelsY;
+
+
+
+
+        collisonWithBullets(bee_x, bee_y, bullet_exists, bee_exists, bullet_x, bullet_y, maxBees, sound, honeycomb_x, honeycomb_y, honeycomb_exists, maxHoneycombs, prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists, maxPreHoneycombs, playerScore, hive_x, hive_y, hive_exists, prehive_x, prehive_y, prehive_exists, maxPreHive, fastmaxBees, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, fastBee_exists, fastBee_x, fastBee_y, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        // Collision with Prehoneycombs
+        collisonWithPreHoneycomb(window, bee_x, bee_y, prehoneycomb_x, prehoneycomb_y, bee_exists, bee_direction, maxBees, prehoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxPreHoneycombs, maxHives);
+        // Collision with honeycombs
+        collisonWithHoneycomb(window, bee_x, bee_y, honeycomb_x, honeycomb_y, bee_exists, bee_direction, maxBees, honeycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxHoneycombs, maxHives);
+        // collision with hives
+        collisonWithHive(window, bee_x, bee_y, hive_x, hive_y, bee_exists, bee_direction, maxBees, hive_exists);
+
+        // Calling drawHoneycomb function
+        drawHoneycomb(window, honeycomb_x, honeycomb_y, honeycombSprite, honeycomb_exists, prehoneycomb_x, prehoneycomb_y, prehoneycombSprite, prehoneycomb_exists, maxHoneycombs, maxPreHoneycombs);
+
+
+        // Calling spawnBee function
+        spawnBee(bee_x, bee_y, bee_exists, bee_direction, bee_spawned, spawnClock, lastSpawnTime, maxBees);
+        drawBee(window, bee_x, bee_y, beeSprite, bee_exists, bee_direction, maxBees, bee_paused, bee_pause_timer, beePauseClocks, beeAnimFrame, beeAnimClocks);
+
+        // Draw Humming bird
+        spawnbird(bird_exists, bird_clock, bird_x, bird_y);
+        drawbird(window, bird_x, bird_y, birdSprite, bird_exists, bird_direction_x, bird_direction_y, bird_clock);
+        movebird(bird_x, bird_y, bird_pause_clock, bird_pause_timer, bird_exists, bird_paused, bird_direction_x, bird_direction_y);
+        hummingbirdInteractWithHoneycomb(
+            bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer,
+            honeycomb_x, honeycomb_y, honeycomb_exists,
+            prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists,
+            maxHoneycombs, maxPreHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        handleHummingbirdCollision(bird_x, bird_y, bullet_exists, bird_exists, bullet_x, bullet_y, sound, bird_health, bird_hit_count, respawn_timer, respawn_clock, birdSprite);
+
+
+        // Calling beehive function
+
+
+        if (bullet_exists) {
+            moveBullet(bullet_y, bullet_exists, bulletClock);
+            drawBullet(window, bullet_x, bullet_y, bulletSprite);
+        }
+        else {
+
+            bullet_x = player_x;
+            bullet_y = player_y;
+        }
+
+        // Calling drawPlayer function
+        drawPlayer(window, player_x, player_y, playerSprite, sprayLevelSprite, powerUpActive, activePowerUp);
+
+
+
+        window.draw(groundRectangle);// Order is important
+        // Showing spray cans
+        if (bullet_counter <= 56) {
+            window.draw(ammoSprite2); // Drawing Ammo1
+
+
+        }
+        if (bullet_counter <= 112) {
+            window.draw(ammoSprite1); // Drawing Ammo2
+
+        }
+        if (bullet_counter > 56 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 0;
+        }
+        if (bullet_counter > 112 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 57;
+        }
+
+
+        // Displaying Score
+        scoreText.setString(to_string(playerScore));
+        window.draw(scoreText);
+
+        // Displaying Spray left
+        can1Text.setString("Spray Left: " + to_string(can1));
+        can2Text.setString("Spray Left: " + to_string(can2));
+        can3Text.setString("Spray Left: " + to_string(can3));
+
+        if (bullet_counter <= 56) {
+            window.draw(can1Text);
+        }
+        if (bullet_counter > 56 && bullet_counter <= 112) {
+            window.draw(can2Text);
+        }
+        if (bullet_counter > 112) {
+            window.draw(can3Text);
+        }
+
+
+        // Decreases the level after every 8 bullets are fired
+        if (bullet_counter == 0) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 8) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 16) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 24) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 32) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 40) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 48) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 56) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        if (bullet_counter == 57) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 65) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 73) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 81) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 89) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 97) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 105) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+
+        if (bullet_counter == 106) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 114) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 122) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 130) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 138) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 146) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 154) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 162) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        // Spawning Flowers
+        spawnFlower(window, bee_x, bee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, maxBees, bee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+
+        // Drawing Flowers
+        for (int i = 0; i < flowerCount; i++) {
+            if (flower_exists[i]) {
+                window.draw(flowerSprites[i]);
+            }
+        }
+        bool levelComplete = checklevel(bee_spawned, maxBees, bee_exists);
+        if (levelComplete) {
+            for (int i = 0; i < maxHives; i++) {
+                if (hive_exists[i]) {
+                    if (hive_y[i] >= 0 && hive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (hive_y[i] >= 64 && hive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (hive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+            for (int i = 0; i < maxPreHive; i++) {
+                if (prehive_exists[i]) {
+                    if (prehive_y[i] >= 0 && prehive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (prehive_y[i] >= 64 && prehive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (prehive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+
+            nextlevel = true;
+            bgMusic.stop();
+            level2(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+
+        }
+
+        if (can3 == 0 || (flowerCount > 20)) {
+            updateHighScores(playerScore, highscores, playerNames, window);
+            playerScore = 0;
+            bullet_counter = 0;
+            nextlevel = false;
+
+            return 0;
+        }
+
+
+
+        window.display(); // Displays everything that was added by window.draw()
+        window.clear(); // Clears everything from the frame so that there is no overlapping of content in the next frame
+    }
+    return 0;
+}
+
+// level 2
+int level2(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]) {
+
+    srand(time(0));
+    // reseting
+    for (int i = 0; i < gameRows; i++) {
+        for (int j = 0; j < gameColumns; j++) {
+            gameGrid[i][j] = 0;
+        }
+    }
+
+    Texture background2Texture;
+    Sprite background2Sprite;
+    background2Texture.loadFromFile("Textures/background2.png");
+    background2Sprite.setTexture(background2Texture);
+    background2Sprite.setScale(4, 3);
+    // Loading the font
+    Font font;
+    font.loadFromFile("Fonts/Roboto-BlackItalic.ttf");
+    // Displaying Score
+    Text scoreText;
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(32);
+    scoreText.setFillColor(Color::Black);
+    scoreText.setPosition(850, 585);
+    // Displaying Game Over
+    Text gameOverText;
+    gameOverText.setFont(font);
+    gameOverText.setString("Game Over");
+    gameOverText.setCharacterSize(60);
+    gameOverText.setFillColor(Color::Red);
+    gameOverText.setStyle(Text::Bold);
+    gameOverText.setPosition(320, 200);
+
+    Text gameOver2Text;
+    gameOver2Text.setFont(font);
+    gameOver2Text.setString("Press SPACE to return to Main Menu");
+    gameOver2Text.setCharacterSize(40);
+    gameOver2Text.setFillColor(Color::Black);
+    gameOver2Text.setPosition(100, 300);
+    // Display can1's spray left
+    int can1 = 56;
+    Text can1Text;
+    can1Text.setFont(font);
+    can1Text.setCharacterSize(32);
+    can1Text.setFillColor(Color::Black);
+    can1Text.setPosition(200, 585);
+    // Display can2's spray left
+    int can2 = 56;
+    Text can2Text;
+    can2Text.setFont(font);
+    can2Text.setCharacterSize(32);
+    can2Text.setFillColor(Color::Black);
+    can2Text.setPosition(200, 585);
+    // Display can3's spray left
+    int can3 = 56;
+    Text can3Text;
+    can3Text.setFont(font);
+    can3Text.setCharacterSize(32);
+    can3Text.setFillColor(Color::Black);
+    can3Text.setPosition(200, 585);
+
+
+
+    // Initializing Background Music
+    Music bgMusic;
+    if (!bgMusic.openFromFile("Music/risk.ogg")) {
+        cout << "Error: Could not load music file!" << endl;
+    }
+    bgMusic.setVolume(50);
+    bgMusic.setLoop(true);
+    bgMusic.play();
+
+    // Sound for collison of bees
+
+    SoundBuffer buffer;
+    if (!buffer.loadFromFile("Sound Effects/hit.wav")) {
+        cout << "Error loading collison sound" << endl;
+        return -1;
+    }
+    // Creating a sound object and linking it to the buffer
+    Sound sound;
+    sound.setBuffer(buffer);
+    // Initializing Player's Location
+
+    int playerGridX = gameColumns / 2; // Horizontal position of player depends on columns : 30 / 2 = 15
+    int playerGridY = gameRows - 4;    // Vertical position of player depends on rows: 20 - 4 = 16
+
+    float player_x = playerGridX * boxPixelsX;// 15 * 32 = 480 which is in the middle of the screen (960 / 2 is also 480)
+    float player_y = playerGridY * boxPixelsY;// 16 * 32 = 512 and it places the player verticaly at 512 y coordinate
+
+    // Player texture and player sprite
+    Texture playerTexture; // Making an object of class Texture
+    Sprite playerSprite; // Making an object of class sprite
+    playerTexture.loadFromFile("Textures/spray.png"); // Loading the texture from the file
+    playerSprite.setTexture(playerTexture); // Putting texture
+    // Spray can level
+    Texture sprayLevelTexture;
+    Sprite sprayLevelSprite;
+    sprayLevelTexture.loadFromFile("Textures/sprayLevel.png");
+    sprayLevelSprite.setTexture(sprayLevelTexture);
+
+    // Scoring
+
+
+
+    // Ammo texture and ammo sprite
+    Texture ammoTexture;
+    Sprite ammoSprite1;  // First ammo
+    Sprite ammoSprite2;  // Second ammo
+    ammoTexture.loadFromFile("Textures/spray.png");
+    ammoSprite1.setTexture(ammoTexture);
+    ammoSprite2.setTexture(ammoTexture);
+    ammoSprite1.setPosition(10, 570);
+    ammoSprite2.setPosition(60, 570);
+
+    // Initializing Honeycombs
+    float honeycomb_x[15] = { 0 };
+    float honeycomb_y[15] = { 0 };
+    bool honeycomb_exists[15] = { false };
+    Texture honeycombTexture;
+    Sprite honeycombSprite;
+    honeycombTexture.loadFromFile("Textures/honeycomb.png");
+    honeycombSprite.setTexture(honeycombTexture);
+    const int maxHoneycombs = 15;
+    // Fast honeycombs
+    float fasthoneycomb_x[5] = { 0 };
+    float fasthoneycomb_y[5] = { 0 };
+    bool fasthoneycomb_exists[5] = { false };
+    Texture fasthoneycombTexture;
+    Sprite fasthoneycombSprite;
+    fasthoneycombTexture.loadFromFile("Textures/honeycomb_red.png");
+    fasthoneycombSprite.setTexture(fasthoneycombTexture);
+    const int fastMaxHoneycombs = 5;
+    //9 pregenerated Honeycombs
+    float prehoneycomb_x[9] = { 0 };
+    float prehoneycomb_y[9] = { 0 };
+    Texture prehoneycombTexture;
+    Sprite prehoneycombSprite;
+    prehoneycombTexture.loadFromFile("Textures/honeycomb.png");
+    prehoneycombSprite.setTexture(honeycombTexture);
+    const int maxPreHoneycombs = 9;
+    bool prehoneycomb_exists[maxPreHoneycombs] = { true,true,true,true,true,true,true,true,true };
+    // Giving them random values
+    for (int i = 0; i < maxPreHoneycombs; i++) {
+        prehoneycomb_x[i] = rand() % (resolutionX - boxPixelsX - 100) + 50;
+        prehoneycomb_y[i] = rand() % (resolutionY / 2 - boxPixelsY); //Dont want them to spawn at lower half
+
+    }
+
+
+
+
+    // Initializing Bullet and Bullet Sprites
+    float bullet_x = player_x;
+    float bullet_y = player_y;
+    bool bullet_exists = false;
+
+
+    Clock bulletClock;
+    Texture bulletTexture;
+    Sprite bulletSprite;
+    bulletTexture.loadFromFile("Textures/bullet.png");
+    bulletSprite.setTexture(bulletTexture);
+    bulletSprite.setScale(1, 1);
+    bulletSprite.setTextureRect(IntRect(0, 0, boxPixelsX, boxPixelsY)); // This allows us to specify the part of texture that we are using (used for handling sprite sheets)
+
+    //Flowers Texture and Sprite
+
+    const int maxFlowers = 22;
+    Sprite flowerSprites[maxFlowers];
+
+    Texture flowerTexture;
+    flowerTexture.loadFromFile("Textures/obstacles.png");
+
+    int flowerCount = 0;
+    bool flower_exists[22] = { false };
+    static bool firstleft = true;
+    static bool firstright = true;
+
+
+
+
+
+    // The ground on which the player moves
+    RectangleShape groundRectangle(Vector2f(960, 64));// 960 is the width and 64 is the height
+    groundRectangle.setPosition(0, (gameRows - 2) * boxPixelsY);
+    groundRectangle.setFillColor(Color::Green);
+    // Bees
+    const int maxBees = 15;   // For Level 1
+    int bee_x[maxBees] = { false }, bee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool bee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int bee_direction[maxBees] = { 1 };  // 1 for right, -1 for left
+    int bee_spawned = 0;   // counter for number of bees
+    int lastSpawnTime = 0; // last spawning time of bee
+    Clock spawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock beePauseClocks[maxBees];
+    bool bee_paused[maxBees] = { false };
+    int bee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture beeTexture;
+    Sprite beeSprite;
+    beeTexture.loadFromFile("Textures/Regular_bee.png");
+    beeSprite.setTexture(beeTexture);
+
+
+    //Fast Bees
+    const int fastmaxBees = 5;   // For Level 1
+    int fastBee_x[maxBees] = { false };
+    int fastBee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool fastBee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int fastBee_direction[maxBees] = { 1 };  // 1 for right, -1 for left
+    int fastBee_spawned = 0;   // counter for number of bees
+    int fastlastSpawnTime = 0; // last spawning time of bee
+    Clock fastspawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock fastBeePauseClocks[maxBees];
+    bool fastBee_paused[maxBees] = { false };
+    int fastBee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture fastBeeTexture;
+    Sprite fastBeeSprite;
+    fastBeeTexture.loadFromFile("Textures/Fast_bee.png");
+    fastBeeSprite.setTexture(fastBeeTexture);
+
+
+    // Beehives
+    float hive_x[15] = { 0 };
+    float hive_y[15] = { 0 };
+    int hive_count = 0;
+    bool hive_exists[15] = { false };
+    const int maxHives = 15;
+    Texture hiveTexture;
+    Sprite hiveSprites[maxHives];
+    hiveTexture.loadFromFile("Textures/hive.png");
+    for (int i = 0; i < maxHives; i++) {
+        hiveSprites[i].setTexture(hiveTexture);
+    }
+
+    float prehive_x[5] = { 0 };
+    float prehive_y[5] = { 0 };
+    Texture prehiveTexture;
+    Sprite prehiveSprite;
+    prehiveTexture.loadFromFile("Textures/hive.png");
+    prehiveSprite.setTexture(honeycombTexture);
+    const int maxPreHive = 5;
+    bool prehive_exists[maxPreHoneycombs] = { true,true,true,true,true };
+
+
+
+
+
+
+
+
+    // Humming Bird
+    float bird_x;
+    float bird_y;
+    bool bird_exists = false;
+    int bird_direction_x = 0;
+    int bird_direction_y = 0;
+    int bird_health = 3;
+    bool bird_paused = false;
+    Clock bird_clock;
+    int bird_pause_timer;
+    Clock bird_pause_clock;
+    int bird_movement_counter = 0;
+    Clock respawn_clock;
+    int bird_hit_count = 0;
+    float respawn_timer;
+
+    // Hummingbird Texture and Sprite
+    Texture birdTexture;
+    Sprite birdSprite;
+    birdTexture.loadFromFile("Textures/bird.png");
+    birdSprite.setTexture(birdTexture);
+    birdSprite.setScale(2, 2);
+
+    // Declaring the clock for movement
+    Clock movementClock;
+    Clock shootClock;
+    int beeAnimFrame[maxBees] = { 0 };
+    Clock beeAnimClocks[maxBees];
+
+    int maxPowerUps = 10;
+    int powerUpType[10];
+    float powerUpX[10];
+    float powerUpY[10];
+    bool powerUpExists[10];
+    Clock powerUpDropClock[10];
+
+    int activePowerUp = 0;
+    Clock powerUpEffectClock;
+    float powerUpDuration = 5.0;
+    bool powerUpActive = false;
+
+    Texture speedUpTexture, speedDownTexture, heightUpTexture, heightDownTexture;
+    speedUpTexture.loadFromFile("Textures/speed_Inc.png");
+    speedDownTexture.loadFromFile("Textures/speed_Dec.png");
+    heightUpTexture.loadFromFile("Textures/height_Inc.png");
+    heightDownTexture.loadFromFile("Textures/height_Dec.png");
+    Sprite speedUpSprite;
+    Sprite speedDownSprite;
+    Sprite heightUpSprite;
+    Sprite heightDownSprite;
+
+    while (window.isOpen()) {
+        if (backToMainMenu(window)) {
+            return 0;  // Return to Main Menu
+        }
+
+        //Background
+        window.draw(background2Sprite);
+        // Movement in grid
+        if (movementClock.getElapsedTime().asMilliseconds() > 100) { // Delay of 0.1 sec
+            // For left movement
+            if (Keyboard::isKeyPressed(Keyboard::Left) && playerGridX > 0 && gameGrid[playerGridY][playerGridX - 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX--; // Move left
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            // For right movement
+            else if (Keyboard::isKeyPressed(Keyboard::Right) && playerGridX < gameColumns - 1 && gameGrid[playerGridY][playerGridX + 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX++; // Move right
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            movementClock.restart(); // Reset clock
+        }
+
+        if ((gameGrid[playerGridY][playerGridX - 1] == 2) && (gameGrid[playerGridY][playerGridX + 1] == 2)) {
+
+            // Jumping
+            for (int i = 0; i < gameColumns; i++) {
+                if (playerGridX - i >= 0 && gameGrid[playerGridY][playerGridX - i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX - i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+                if (playerGridX + i < gameColumns && gameGrid[playerGridY][playerGridX + i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX + i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+
+            }
+        }
+
+
+
+
+        //cout<<gameGrid[16][15]<<endl;
+        //cout<<gameGrid[16][14]<<endl;
+        //cout<<gameGrid[16][16]<<endl;
+        //cout<<"player x"<<player_x<<endl;
+        //cout<<"player y"<<player_y<<endl;
+
+        // For shooting
+        if (shootClock.getElapsedTime().asMilliseconds() > 500) {
+            if (Keyboard::isKeyPressed(Keyboard::Space) && !bullet_exists) {
+                bullet_exists = true;
+                // Positioning of bullet along x and y axis
+                bullet_x = player_x + boxPixelsX / 2; // Positioning the bullet with the center of spray can
+                bullet_y = player_y;
+                bullet_counter++; // Incrementing the counter each time the bullet is fired
+                if (bullet_counter <= 56) {
+                    can1--;
+                }
+                if (bullet_counter > 57 && bullet_counter <= 112) {
+                    can2--;
+                }
+                if (bullet_counter > 113 && bullet_counter <= 169) {
+                    can3--;
+                }
+
+                shootClock.restart(); // Reset clock
+            }
+        }
+        // Update player position in pixels
+        player_x = playerGridX * boxPixelsX;
+        player_y = playerGridY * boxPixelsY;
+
+
+
+        collisonWithBullets(bee_x, bee_y, bullet_exists, bee_exists, bullet_x, bullet_y, maxBees, sound, honeycomb_x, honeycomb_y, honeycomb_exists, maxHoneycombs, prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists, maxPreHoneycombs, playerScore, hive_x, hive_y, hive_exists, prehive_x, prehive_y, prehive_exists, maxPreHive, fastmaxBees, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, fastBee_exists, fastBee_x, fastBee_y, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        // Collision with Prehoneycombs
+        collisonWithPreHoneycomb(window, bee_x, bee_y, prehoneycomb_x, prehoneycomb_y, bee_exists, bee_direction, maxBees, prehoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxPreHoneycombs, maxHives);
+        // Collision with honeycombs
+        collisonWithHoneycomb(window, bee_x, bee_y, honeycomb_x, honeycomb_y, bee_exists, bee_direction, maxBees, honeycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxHoneycombs, maxHives);
+        //Collision with red
+        collisonWithFastHoneycomb(window, bee_x, bee_y, fasthoneycomb_x, fasthoneycomb_y, bee_exists, bee_direction, maxBees, fasthoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, fastMaxHoneycombs, maxHives);
+        // collision with hives
+        collisonWithHive(window, bee_x, bee_y, hive_x, hive_y, bee_exists, bee_direction, maxBees, hive_exists);
+        collisonWithPreHive(window, bee_x, bee_y, prehive_x, prehive_y, bee_exists, bee_direction, maxBees, prehive_exists);
+
+        // Calling drawHoneycomb function
+        drawHoneycomb(window, honeycomb_x, honeycomb_y, honeycombSprite, honeycomb_exists, prehoneycomb_x, prehoneycomb_y, prehoneycombSprite, prehoneycomb_exists, maxHoneycombs, maxPreHoneycombs);
+        // Drawing red honeycombs
+        drawFastHoneycomb(window, fasthoneycomb_x, fasthoneycomb_y, fasthoneycombSprite, fasthoneycomb_exists, fastMaxHoneycombs);
+
+        // Calling spawnBee function
+        spawnBee(bee_x, bee_y, bee_exists, bee_direction, bee_spawned, spawnClock, lastSpawnTime, maxBees);
+        drawBee(window, bee_x, bee_y, beeSprite, bee_exists, bee_direction, maxBees, bee_paused, bee_pause_timer, beePauseClocks, beeAnimFrame, beeAnimClocks);
+        // Fast Bees
+        spawnFastBee(fastBee_x, fastBee_y, fastBee_exists, fastBee_direction, fastBee_spawned, fastspawnClock, fastlastSpawnTime, fastmaxBees);
+        drawFastBee(window, fastBee_x, fastBee_y, fastBeeSprite, fastBee_exists, fastBee_direction, fastmaxBees, fastBee_paused, fastBee_pause_timer, fastBeePauseClocks);
+        // Draw Humming bird
+        spawnbird(bird_exists, bird_clock, bird_x, bird_y);
+        drawbird(window, bird_x, bird_y, birdSprite, bird_exists, bird_direction_x, bird_direction_y, bird_clock);
+        movebird(bird_x, bird_y, bird_pause_clock, bird_pause_timer, bird_exists, bird_paused, bird_direction_x, bird_direction_y);
+        hummingbirdInteractWithHoneycomb(
+            bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer,
+            honeycomb_x, honeycomb_y, honeycomb_exists,
+            prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists,
+            maxHoneycombs, maxPreHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        handleHummingbirdCollision(bird_x, bird_y, bullet_exists, bird_exists, bullet_x, bullet_y, sound, bird_health, bird_hit_count, respawn_timer, respawn_clock, birdSprite);
+        hummingbirdInteractWithRedHoneycomb(bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        drawHives(window, hiveSprites, hive_exists, hive_x, hive_y, hive_count, prehive_x, prehive_y, prehiveSprite, prehive_exists, maxPreHive);
+
+        // Calling beehive function
+
+
+        if (bullet_exists) {
+            moveBullet(bullet_y, bullet_exists, bulletClock);
+            drawBullet(window, bullet_x, bullet_y, bulletSprite);
+        }
+        else {
+
+            bullet_x = player_x;
+            bullet_y = player_y;
+        }
+
+        // Calling drawPlayer function
+        drawPlayer(window, player_x, player_y, playerSprite, sprayLevelSprite, powerUpActive, activePowerUp);
+
+
+
+        window.draw(groundRectangle);// Order is important
+        // Showing spray cans
+        if (bullet_counter <= 56) {
+            window.draw(ammoSprite2); // Drawing Ammo1
+
+
+        }
+        if (bullet_counter <= 112) {
+            window.draw(ammoSprite1); // Drawing Ammo2
+
+        }
+        if (bullet_counter > 56 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 0;
+        }
+        if (bullet_counter > 112 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 57;
+        }
+
+
+        // Displaying Score
+        scoreText.setString(std::to_string(playerScore));
+        window.draw(scoreText);
+
+        // Displaying Spray left
+        can1Text.setString("Spray Left: " + std::to_string(can1));
+        can2Text.setString("Spray Left: " + std::to_string(can2));
+        can3Text.setString("Spray Left: " + std::to_string(can3));
+
+        if (bullet_counter <= 56) {
+            window.draw(can1Text);
+        }
+        if (bullet_counter > 56 && bullet_counter <= 112) {
+            window.draw(can2Text);
+        }
+        if (bullet_counter > 112) {
+            window.draw(can3Text);
+        }
+
+
+        // Decreases the level after every 8 bullets are fired
+        if (bullet_counter == 0) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 8) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 16) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 24) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 32) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 40) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 48) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 56) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        if (bullet_counter == 57) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 65) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 73) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 81) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 89) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 97) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 105) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+
+        if (bullet_counter == 106) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 114) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 122) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 130) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 138) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 146) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 154) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 162) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        // Spawning Flowers
+        spawnFlower(window, bee_x, bee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, maxBees, bee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+        // fast spawning
+        spawnFastFlower(window, fastBee_x, fastBee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, fastmaxBees, fastBee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+
+        // Drawing Flowers
+        for (int i = 0; i < flowerCount; i++) {
+            if (flower_exists[i]) {
+                window.draw(flowerSprites[i]);
+            }
+        }
+        bool levelComplete = checklevel(bee_spawned, maxBees, bee_exists);
+        if (levelComplete) {
+            for (int i = 0; i < maxHives; i++) {
+                if (hive_exists[i]) {
+                    if (hive_y[i] >= 0 && hive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (hive_y[i] >= 64 && hive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (hive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+            for (int i = 0; i < maxPreHive; i++) {
+                if (prehive_exists[i]) {
+                    if (prehive_y[i] >= 0 && prehive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (prehive_y[i] >= 64 && prehive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (prehive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+
+            nextlevel = true;
+            bgMusic.stop();
+            level3(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+
+        }
+
+        if (can3 == 0 || (flowerCount > 29)) {
+            updateHighScores(playerScore, highscores, playerNames, window);
+            playerScore = 0;
+            bullet_counter = 0;
+            nextlevel = false;
+
+            return 0;
+        }
+
+        window.display(); // Displays everything that was added by window.draw()
+        window.clear(); // Clears everything from the frame so that there is no overlapping of content in the next frame
+    }
+    return 0;
+}
+// level 3
+int level3(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]) {
+    srand(time(0));
+    // reseting
+    for (int i = 0; i < gameRows; i++) {
+        for (int j = 0; j < gameColumns; j++) {
+            gameGrid[i][j] = 0;
+        }
+    }
+
+    // Background
+    Texture background3Texture;
+    Sprite background3Sprite;
+    background3Texture.loadFromFile("Textures/background3.png");
+    background3Sprite.setTexture(background3Texture);
+    background3Sprite.setScale(4, 3);
+    // Loading the font
+    Font font;
+    font.loadFromFile("Fonts/Roboto-BlackItalic.ttf");
+    // Displaying Score
+    Text scoreText;
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(32);
+    scoreText.setFillColor(Color::Black);
+    scoreText.setPosition(850, 585);
+    // Displaying Game Over
+    Text gameOverText;
+    gameOverText.setFont(font);
+    gameOverText.setString("Game Over");
+    gameOverText.setCharacterSize(60);
+    gameOverText.setFillColor(Color::Red);
+    gameOverText.setStyle(Text::Bold);
+    gameOverText.setPosition(320, 200);
+
+    Text gameOver2Text;
+    gameOver2Text.setFont(font);
+    gameOver2Text.setString("Press SPACE to return to Main Menu");
+    gameOver2Text.setCharacterSize(40);
+    gameOver2Text.setFillColor(Color::Black);
+    gameOver2Text.setPosition(100, 300);
+    // Display can1's spray left
+    int can1 = 56;
+    Text can1Text;
+    can1Text.setFont(font);
+    can1Text.setCharacterSize(32);
+    can1Text.setFillColor(Color::Black);
+    can1Text.setPosition(200, 585);
+    // Display can2's spray left
+    int can2 = 56;
+    Text can2Text;
+    can2Text.setFont(font);
+    can2Text.setCharacterSize(32);
+    can2Text.setFillColor(Color::Black);
+    can2Text.setPosition(200, 585);
+    // Display can3's spray left
+    int can3 = 56;
+    Text can3Text;
+    can3Text.setFont(font);
+    can3Text.setCharacterSize(32);
+    can3Text.setFillColor(Color::Black);
+    can3Text.setPosition(200, 585);
+
+
+
+    // Initializing Background Music
+    Music bgMusic;
+    if (!bgMusic.openFromFile("Music/magical_journey.ogg")) {
+        cout << "Error: Could not load music file!" << endl;
+    }
+    bgMusic.setVolume(50);
+    bgMusic.setLoop(true);
+    bgMusic.play();
+
+    // Sound for collison of bees
+
+    SoundBuffer buffer;
+    if (!buffer.loadFromFile("Sound Effects/hit.wav")) {
+        cout << "Error loading collison sound" << endl;
+        return -1;
+    }
+    // Creating a sound object and linking it to the buffer
+    Sound sound;
+    sound.setBuffer(buffer);
+    // Initializing Player's Location
+
+    int playerGridX = gameColumns / 2; // Horizontal position of player depends on columns : 30 / 2 = 15
+    int playerGridY = gameRows - 4;    // Vertical position of player depends on rows: 20 - 4 = 16
+
+    float player_x = playerGridX * boxPixelsX;// 15 * 32 = 480 which is in the middle of the screen (960 / 2 is also 480)
+    float player_y = playerGridY * boxPixelsY;// 16 * 32 = 512 and it places the player verticaly at 512 y coordinate
+
+    // Player texture and player sprite
+    Texture playerTexture; // Making an object of class Texture
+    Sprite playerSprite; // Making an object of class sprite
+    playerTexture.loadFromFile("Textures/spray.png"); // Loading the texture from the file
+    playerSprite.setTexture(playerTexture); // Putting texture
+    // Spray can level
+    Texture sprayLevelTexture;
+    Sprite sprayLevelSprite;
+    sprayLevelTexture.loadFromFile("Textures/sprayLevel.png");
+    sprayLevelSprite.setTexture(sprayLevelTexture);
+
+    // Scoring
+
+
+
+    // Ammo texture and ammo sprite
+    Texture ammoTexture;
+    Sprite ammoSprite1;  // First ammo
+    Sprite ammoSprite2;  // Second ammo
+    ammoTexture.loadFromFile("Textures/spray.png");
+    ammoSprite1.setTexture(ammoTexture);
+    ammoSprite2.setTexture(ammoTexture);
+    ammoSprite1.setPosition(10, 570);
+    ammoSprite2.setPosition(60, 570);
+
+    // Initializing Honeycombs
+    float honeycomb_x[20] = { 0 };
+    float honeycomb_y[20] = { 0 };
+    bool honeycomb_exists[20] = { false };
+    Texture honeycombTexture;
+    Sprite honeycombSprite;
+    honeycombTexture.loadFromFile("Textures/honeycomb.png");
+    honeycombSprite.setTexture(honeycombTexture);
+    const int maxHoneycombs = 20;
+    // Fast honeycombs
+    float fasthoneycomb_x[10] = { 0 };
+    float fasthoneycomb_y[10] = { 0 };
+    bool fasthoneycomb_exists[10] = { false };
+    Texture fasthoneycombTexture;
+    Sprite fasthoneycombSprite;
+    fasthoneycombTexture.loadFromFile("Textures/honeycomb_red.png");
+    fasthoneycombSprite.setTexture(fasthoneycombTexture);
+    const int fastMaxHoneycombs = 10;
+    //15 pregenerated Honeycombs
+    float prehoneycomb_x[15] = { 0 };
+    float prehoneycomb_y[15] = { 0 };
+    Texture prehoneycombTexture;
+    Sprite prehoneycombSprite;
+    prehoneycombTexture.loadFromFile("Textures/honeycomb.png");
+    prehoneycombSprite.setTexture(honeycombTexture);
+    const int maxPreHoneycombs = 15;
+    bool prehoneycomb_exists[maxPreHoneycombs] = { true,true,true,true,true,true,true,true,true,true,true,true,true,true,true };
+    // Giving them random values
+    for (int i = 0; i < 15; i++) {
+        prehoneycomb_x[i] = rand() % (resolutionX - boxPixelsX - 200) + 100;
+        prehoneycomb_y[i] = rand() % (resolutionY / 2 - boxPixelsY); //Dont want them to spawn at lower half
+
+    }
+
+
+
+
+    // Initializing Bullet and Bullet Sprites
+    float bullet_x = player_x;
+    float bullet_y = player_y;
+    bool bullet_exists = false;
+
+    Clock bulletClock;
+    Texture bulletTexture;
+    Sprite bulletSprite;
+    bulletTexture.loadFromFile("Textures/bullet.png");
+    bulletSprite.setTexture(bulletTexture);
+    bulletSprite.setScale(1, 1);
+    bulletSprite.setTextureRect(IntRect(0, 0, boxPixelsX, boxPixelsY)); // This allows us to specify the part of texture that we are using (used for handling sprite sheets)
+
+    //Flowers Texture and Sprite
+
+    const int maxFlowers = 32;
+    Sprite flowerSprites[maxFlowers];
+
+    Texture flowerTexture;
+    flowerTexture.loadFromFile("Textures/obstacles.png");
+
+    int flowerCount = 0;
+    bool flower_exists[32] = { false };
+    static bool firstleft = true;
+    static bool firstright = true;
+
+
+
+
+
+    // The ground on which the player moves
+    RectangleShape groundRectangle(Vector2f(960, 64));// 960 is the width and 64 is the height
+    groundRectangle.setPosition(0, (gameRows - 2) * boxPixelsY);
+    groundRectangle.setFillColor(Color::Green);
+    // Bees
+    const int maxBees = 20;   // For Level 3
+    int bee_x[maxBees] = { false }, bee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool bee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int bee_direction[maxBees] = { 1 };  // 1 for right, -1 for left
+    int bee_spawned = 0;   // counter for number of bees
+    int lastSpawnTime = 0; // last spawning time of bee
+    Clock spawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock beePauseClocks[maxBees];
+    bool bee_paused[maxBees] = { false };
+    int bee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture beeTexture;
+    Sprite beeSprite;
+    beeTexture.loadFromFile("Textures/Regular_bee.png");
+    beeSprite.setTexture(beeTexture);
+
+
+    //Fast Bees
+    const int fastmaxBees = 10;   // For Level 1
+    int fastBee_x[fastmaxBees] = { false };
+    int fastBee_y[fastmaxBees] = { false };  // 2 arrays of size 20 each
+    bool fastBee_exists[fastmaxBees] = { false }; // boolean array for representing the existence of each bee
+    int fastBee_direction[fastmaxBees] = { 1 };  // 1 for right, -1 for left
+    int fastBee_spawned = 0;   // counter for number of bees
+    int fastlastSpawnTime = 0; // last spawning time of bee
+    Clock fastspawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock fastBeePauseClocks[fastmaxBees];
+    bool fastBee_paused[fastmaxBees] = { false };
+    int fastBee_pause_timer[fastmaxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture fastBeeTexture;
+    Sprite fastBeeSprite;
+    fastBeeTexture.loadFromFile("Textures/Fast_bee.png");
+    fastBeeSprite.setTexture(fastBeeTexture);
+
+
+    // Beehives
+    const int maxHives = 20;
+    float hive_x[maxHives] = { 0 };
+    float hive_y[maxHives] = { 0 };
+    int hive_count = 0;
+    bool hive_exists[maxHives] = { false };
+    Texture hiveTexture;
+    Sprite hiveSprites[maxHives];
+    hiveTexture.loadFromFile("Textures/hive.png");
+    for (int i = 0; i < maxHives; i++) {
+        hiveSprites[i].setTexture(hiveTexture);
+    }
+
+    float prehive_x[5] = { 0 };
+    float prehive_y[5] = { 0 };
+    Texture prehiveTexture;
+    Sprite prehiveSprite;
+    prehiveTexture.loadFromFile("Textures/hive.png");
+    prehiveSprite.setTexture(honeycombTexture);
+    const int maxPreHive = 5;
+    bool prehive_exists[maxPreHoneycombs] = { true,true,true,true,true };
+
+
+
+
+
+
+    // Humming Bird
+    float bird_x;
+    float bird_y;
+    bool bird_exists = false;
+    int bird_direction_x = 0;
+    int bird_direction_y = 0;
+    int bird_health = 3;
+    bool bird_paused = false;
+    Clock bird_clock;
+    int bird_pause_timer;
+    Clock bird_pause_clock;
+    int bird_movement_counter = 0;
+    Clock respawn_clock;
+    int bird_hit_count = 0;
+    float respawn_timer;
+
+    // Hummingbird Texture and Sprite
+    Texture birdTexture;
+    Sprite birdSprite;
+    birdTexture.loadFromFile("Textures/bird.png");
+    birdSprite.setTexture(birdTexture);
+    birdSprite.setScale(2, 2);
+
+    // Declaring the clock for movement
+    Clock movementClock;
+    Clock shootClock;
+    int beeAnimFrame[maxBees] = { 0 };
+    Clock beeAnimClocks[maxBees];
+
+    int maxPowerUps = 10;
+    int powerUpType[10];
+    float powerUpX[10];
+    float powerUpY[10];
+    bool powerUpExists[10];
+    Clock powerUpDropClock[10];
+
+    int activePowerUp = 0;
+    Clock powerUpEffectClock;
+    float powerUpDuration = 5.0;
+    bool powerUpActive = false;
+
+    Texture speedUpTexture, speedDownTexture, heightUpTexture, heightDownTexture;
+    speedUpTexture.loadFromFile("Textures/speed_Inc.png");
+    speedDownTexture.loadFromFile("Textures/speed_Dec.png");
+    heightUpTexture.loadFromFile("Textures/height_Inc.png");
+    heightDownTexture.loadFromFile("Textures/height_Dec.png");
+    Sprite speedUpSprite;
+    Sprite speedDownSprite;
+    Sprite heightUpSprite;
+    Sprite heightDownSprite;
+    while (window.isOpen()) {
+        if (backToMainMenu(window)) {
+            return 0;  // Return to Main Menu
+        }
+
+        //Background
+        window.draw(background3Sprite);
+        // Movement in grid
+        if (movementClock.getElapsedTime().asMilliseconds() > 100) { // Delay of 0.1 sec
+            // For left movement
+            if (Keyboard::isKeyPressed(Keyboard::Left) && playerGridX > 0 && gameGrid[playerGridY][playerGridX - 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX--; // Move left
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            // For right movement
+            else if (Keyboard::isKeyPressed(Keyboard::Right) && playerGridX < gameColumns - 1 && gameGrid[playerGridY][playerGridX + 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX++; // Move right
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            movementClock.restart(); // Reset clock
+        }
+
+        if ((gameGrid[playerGridY][playerGridX - 1] == 2) && (gameGrid[playerGridY][playerGridX + 1] == 2)) {
+
+            // Jumping
+            for (int i = 0; i < gameColumns; i++) {
+                if (playerGridX - i >= 0 && gameGrid[playerGridY][playerGridX - i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX - i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+                if (playerGridX + i < gameColumns && gameGrid[playerGridY][playerGridX + i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX + i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+
+            }
+        }
+
+
+
+
+        //cout<<gameGrid[16][15]<<endl;
+        //cout<<gameGrid[16][14]<<endl;
+        //cout<<gameGrid[16][16]<<endl;
+        //cout<<"player x"<<player_x<<endl;
+        //cout<<"player y"<<player_y<<endl;
+
+        // For shooting
+        if (shootClock.getElapsedTime().asMilliseconds() > 500) {
+            if (Keyboard::isKeyPressed(Keyboard::Space) && !bullet_exists) {
+                bullet_exists = true;
+                // Positioning of bullet along x and y axis
+                bullet_x = player_x + boxPixelsX / 2; // Positioning the bullet with the center of spray can
+                bullet_y = player_y;
+                bullet_counter++; // Incrementing the counter each time the bullet is fired
+                if (bullet_counter <= 56) {
+                    can1--;
+                }
+                if (bullet_counter > 57 && bullet_counter <= 112) {
+                    can2--;
+                }
+                if (bullet_counter > 113 && bullet_counter <= 169) {
+                    can3--;
+                }
+
+
+
+                shootClock.restart(); // Reset clock
+            }
+        }
+        // Update player position in pixels
+        player_x = playerGridX * boxPixelsX;
+        player_y = playerGridY * boxPixelsY;
+
+
+
+
+        collisonWithBullets(bee_x, bee_y, bullet_exists, bee_exists, bullet_x, bullet_y, maxBees, sound, honeycomb_x, honeycomb_y, honeycomb_exists, maxHoneycombs, prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists, maxPreHoneycombs, playerScore, hive_x, hive_y, hive_exists, prehive_x, prehive_y, prehive_exists, maxPreHive, fastmaxBees, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, fastBee_exists, fastBee_x, fastBee_y, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        // Collision with Prehoneycombs
+        collisonWithPreHoneycomb(window, bee_x, bee_y, prehoneycomb_x, prehoneycomb_y, bee_exists, bee_direction, maxBees, prehoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxPreHoneycombs, maxHives);
+        // Collision with honeycombs
+        collisonWithHoneycomb(window, bee_x, bee_y, honeycomb_x, honeycomb_y, bee_exists, bee_direction, maxBees, honeycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxHoneycombs, maxHives);
+        //Collision with red
+        collisonWithFastHoneycomb(window, bee_x, bee_y, fasthoneycomb_x, fasthoneycomb_y, bee_exists, bee_direction, maxBees, fasthoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, fastMaxHoneycombs, maxHives);
+        // collision with hives
+        collisonWithHive(window, bee_x, bee_y, hive_x, hive_y, bee_exists, bee_direction, maxBees, hive_exists);
+        collisonWithPreHive(window, bee_x, bee_y, prehive_x, prehive_y, bee_exists, bee_direction, maxBees, prehive_exists);
+
+        // Calling drawHoneycomb function
+        drawHoneycomb(window, honeycomb_x, honeycomb_y, honeycombSprite, honeycomb_exists, prehoneycomb_x, prehoneycomb_y, prehoneycombSprite, prehoneycomb_exists, maxHoneycombs, maxPreHoneycombs);
+        // Drawing red honeycombs
+        drawFastHoneycomb(window, fasthoneycomb_x, fasthoneycomb_y, fasthoneycombSprite, fasthoneycomb_exists, fastMaxHoneycombs);
+
+        // Calling spawnBee function
+        spawnBee(bee_x, bee_y, bee_exists, bee_direction, bee_spawned, spawnClock, lastSpawnTime, maxBees);
+        drawBee(window, bee_x, bee_y, beeSprite, bee_exists, bee_direction, maxBees, bee_paused, bee_pause_timer, beePauseClocks, beeAnimFrame, beeAnimClocks);
+        // Fast Bees
+        spawnFastBee(fastBee_x, fastBee_y, fastBee_exists, fastBee_direction, fastBee_spawned, fastspawnClock, fastlastSpawnTime, fastmaxBees);
+        drawFastBee(window, fastBee_x, fastBee_y, fastBeeSprite, fastBee_exists, fastBee_direction, fastmaxBees, fastBee_paused, fastBee_pause_timer, fastBeePauseClocks);
+        // Draw Humming bird
+        spawnbird(bird_exists, bird_clock, bird_x, bird_y);
+        drawbird(window, bird_x, bird_y, birdSprite, bird_exists, bird_direction_x, bird_direction_y, bird_clock);
+        movebird(bird_x, bird_y, bird_pause_clock, bird_pause_timer, bird_exists, bird_paused, bird_direction_x, bird_direction_y);
+        hummingbirdInteractWithHoneycomb(
+            bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer,
+            honeycomb_x, honeycomb_y, honeycomb_exists,
+            prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists,
+            maxHoneycombs, maxPreHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        handleHummingbirdCollision(bird_x, bird_y, bullet_exists, bird_exists, bullet_x, bullet_y, sound, bird_health, bird_hit_count, respawn_timer, respawn_clock, birdSprite);
+        hummingbirdInteractWithRedHoneycomb(bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        drawHives(window, hiveSprites, hive_exists, hive_x, hive_y, hive_count, prehive_x, prehive_y, prehiveSprite, prehive_exists, maxPreHive);
+
+        // Calling beehive function
+
+
+        if (bullet_exists) {
+            moveBullet(bullet_y, bullet_exists, bulletClock);
+            drawBullet(window, bullet_x, bullet_y, bulletSprite);
+        }
+        else {
+
+            bullet_x = player_x;
+            bullet_y = player_y;
+        }
+
+        // Calling drawPlayer function
+        drawPlayer(window, player_x, player_y, playerSprite, sprayLevelSprite, powerUpActive, activePowerUp);
+
+
+
+        window.draw(groundRectangle);// Order is important
+        // Showing spray cans
+        if (bullet_counter <= 56) {
+            window.draw(ammoSprite2); // Drawing Ammo1
+
+
+        }
+        if (bullet_counter <= 112) {
+            window.draw(ammoSprite1); // Drawing Ammo2
+
+        }
+        if (bullet_counter > 56 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 0;
+        }
+        if (bullet_counter > 112 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 57;
+        }
+
+
+        // Displaying Score
+        scoreText.setString(std::to_string(playerScore));
+        window.draw(scoreText);
+
+        // Displaying Spray left
+        can1Text.setString("Spray Left: " + std::to_string(can1));
+        can2Text.setString("Spray Left: " + std::to_string(can2));
+        can3Text.setString("Spray Left: " + std::to_string(can3));
+
+        if (bullet_counter <= 56) {
+            window.draw(can1Text);
+        }
+        if (bullet_counter > 56 && bullet_counter <= 112) {
+            window.draw(can2Text);
+        }
+        if (bullet_counter > 112) {
+            window.draw(can3Text);
+        }
+
+
+        // Decreases the level after every 8 bullets are fired
+        if (bullet_counter == 0) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 8) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 16) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 24) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 32) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 40) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 48) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 56) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        if (bullet_counter == 57) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 65) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 73) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 81) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 89) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 97) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 105) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+
+        if (bullet_counter == 106) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 114) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 122) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 130) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 138) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 146) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 154) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 162) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        // Spawning Flowers
+        spawnFlower(window, bee_x, bee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, maxBees, bee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+        // fast spawning
+        spawnFastFlower(window, fastBee_x, fastBee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, fastmaxBees, fastBee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+
+        // Drawing Flowers
+        for (int i = 0; i < flowerCount; i++) {
+            if (flower_exists[i]) {
+                window.draw(flowerSprites[i]);
+            }
+        }
+        bool levelComplete = checklevel(bee_spawned, maxBees, bee_exists);
+        if (levelComplete) {
+            for (int i = 0; i < maxHives; i++) {
+                if (hive_exists[i]) {
+                    if (hive_y[i] >= 0 && hive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (hive_y[i] >= 64 && hive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (hive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+            for (int i = 0; i < maxPreHive; i++) {
+                if (prehive_exists[i]) {
+                    if (prehive_y[i] >= 0 && prehive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (prehive_y[i] >= 64 && prehive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (prehive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+
+            nextlevel = true;
+            bgMusic.stop();
+            level4(window, playerScore, nextlevel, bullet_counter, highscores, playerNames);
+
+        }
+
+        if (can3 == 0 || (flowerCount > 29)) {
+            updateHighScores(playerScore, highscores, playerNames, window);
+            playerScore = 0;
+            bullet_counter = 0;
+            nextlevel = false;
+
+            return 0;
+        }
+
+        window.display(); // Displays everything that was added by window.draw()
+        window.clear(); // Clears everything from the frame so that there is no overlapping of content in the next frame
+    }
+    return 0;
+}
+
+// Function Definitions
+
+// level 4
+int level4(RenderWindow& window, int& playerScore, bool& nextlevel, int& bullet_counter, int highscores[], string playerNames[]) {
+    srand(time(0));
+    // reseting
+    for (int i = 0; i < gameRows; i++) {
+        for (int j = 0; j < gameColumns; j++) {
+            gameGrid[i][j] = 0;
+        }
+    }
+
+    // Background
+    Texture background4Texture;
+    Sprite background4Sprite;
+    background4Texture.loadFromFile("Textures/background4.png");
+    background4Sprite.setTexture(background4Texture);
+    background4Sprite.setScale(4, 3);
+    // Loading the font
+    Font font;
+    font.loadFromFile("Fonts/Roboto-BlackItalic.ttf");
+    // Displaying Score
+    Text scoreText;
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(32);
+    scoreText.setFillColor(Color::Black);
+    scoreText.setPosition(850, 585);
+    // Displaying Game Over
+    Text gameOverText;
+    gameOverText.setFont(font);
+    gameOverText.setString("Game Over");
+    gameOverText.setCharacterSize(60);
+    gameOverText.setFillColor(Color::Red);
+    gameOverText.setStyle(Text::Bold);
+    gameOverText.setPosition(320, 200);
+
+    Text gameOver2Text;
+    gameOver2Text.setFont(font);
+    gameOver2Text.setString("Press SPACE to return to Main Menu");
+    gameOver2Text.setCharacterSize(40);
+    gameOver2Text.setFillColor(Color::Black);
+    gameOver2Text.setPosition(100, 300);
+    // Display can1's spray left
+    int can1 = 56;
+    Text can1Text;
+    can1Text.setFont(font);
+    can1Text.setCharacterSize(32);
+    can1Text.setFillColor(Color::Black);
+    can1Text.setPosition(200, 585);
+    // Display can2's spray left
+    int can2 = 56;
+    Text can2Text;
+    can2Text.setFont(font);
+    can2Text.setCharacterSize(32);
+    can2Text.setFillColor(Color::Black);
+    can2Text.setPosition(200, 585);
+    // Display can3's spray left
+    int can3 = 56;
+    Text can3Text;
+    can3Text.setFont(font);
+    can3Text.setCharacterSize(32);
+    can3Text.setFillColor(Color::Black);
+    can3Text.setPosition(200, 585);
+
+
+
+    // Initializing Background Music
+    Music bgMusic;
+    if (!bgMusic.openFromFile("Music/cave.ogg")) {
+        cout << "Error: Could not load music file!" << endl;
+    }
+    bgMusic.setVolume(50);
+    bgMusic.setLoop(true);
+    bgMusic.play();
+
+    // Sound for collison of bees
+
+    SoundBuffer buffer;
+    if (!buffer.loadFromFile("Sound Effects/hit.wav")) {
+        cout << "Error loading collison sound" << endl;
+        return -1;
+    }
+    // Creating a sound object and linking it to the buffer
+    Sound sound;
+    sound.setBuffer(buffer);
+    // Initializing Player's Location
+
+    int playerGridX = gameColumns / 2; // Horizontal position of player depends on columns : 30 / 2 = 15
+    int playerGridY = gameRows - 4;    // Vertical position of player depends on rows: 20 - 4 = 16
+
+    float player_x = playerGridX * boxPixelsX;// 15 * 32 = 480 which is in the middle of the screen (960 / 2 is also 480)
+    float player_y = playerGridY * boxPixelsY;// 16 * 32 = 512 and it places the player verticaly at 512 y coordinate
+
+    // Player texture and player sprite
+    Texture playerTexture; // Making an object of class Texture
+    Sprite playerSprite; // Making an object of class sprite
+    playerTexture.loadFromFile("Textures/spray.png"); // Loading the texture from the file
+    playerSprite.setTexture(playerTexture); // Putting texture
+    // Spray can level
+    Texture sprayLevelTexture;
+    Sprite sprayLevelSprite;
+    sprayLevelTexture.loadFromFile("Textures/sprayLevel.png");
+    sprayLevelSprite.setTexture(sprayLevelTexture);
+
+    // Scoring
+
+
+
+    // Ammo texture and ammo sprite
+    Texture ammoTexture;
+    Sprite ammoSprite1;  // First ammo
+    Sprite ammoSprite2;  // Second ammo
+    ammoTexture.loadFromFile("Textures/spray.png");
+    ammoSprite1.setTexture(ammoTexture);
+    ammoSprite2.setTexture(ammoTexture);
+    ammoSprite1.setPosition(10, 570);
+    ammoSprite2.setPosition(60, 570);
+    
+    // Initializing Honeycombs
+    float honeycomb_x[20] = { 0 };
+    float honeycomb_y[20] = { 0 };
+    bool honeycomb_exists[20] = { false };
+    Texture honeycombTexture;
+    Sprite honeycombSprite;
+    honeycombTexture.loadFromFile("Textures/honeycomb.png");
+    honeycombSprite.setTexture(honeycombTexture);
+    const int maxHoneycombs = 20;
+    // Fast honeycombs
+    float fasthoneycomb_x[15] = { 0 };
+    float fasthoneycomb_y[15] = { 0 };
+    bool fasthoneycomb_exists[15] = { false };
+    Texture fasthoneycombTexture;
+    Sprite fasthoneycombSprite;
+    fasthoneycombTexture.loadFromFile("Textures/honeycomb_red.png");
+    fasthoneycombSprite.setTexture(fasthoneycombTexture);
+    const int fastMaxHoneycombs = 15;
+    //15 pregenerated Honeycombs
+    float prehoneycomb_x[15] = { 0 };
+    float prehoneycomb_y[15] = { 0 };
+    Texture prehoneycombTexture;
+    Sprite prehoneycombSprite;
+    prehoneycombTexture.loadFromFile("Textures/honeycomb.png");
+    prehoneycombSprite.setTexture(honeycombTexture);
+    const int maxPreHoneycombs = 15;
+    bool prehoneycomb_exists[maxPreHoneycombs] = { true,true,true,true,true,true,true,true,true,true,true,true,true,true,true };
+    // Giving them random values
+    for (int i = 0; i < 15; i++) {
+        prehoneycomb_x[i] = rand() % (resolutionX - boxPixelsX - 200) + 100;
+        prehoneycomb_y[i] = rand() % (resolutionY / 2 - boxPixelsY); //Dont want them to spawn at lower half
+
+    }
+
+
+
+
+    // Initializing Bullet and Bullet Sprites
+    float bullet_x = player_x;
+    float bullet_y = player_y;
+    bool bullet_exists = false;
+
+    Clock bulletClock;
+    Texture bulletTexture;
+    Sprite bulletSprite;
+    bulletTexture.loadFromFile("Textures/bullet.png");
+    bulletSprite.setTexture(bulletTexture);
+    bulletSprite.setScale(1, 1);
+    bulletSprite.setTextureRect(IntRect(0, 0, boxPixelsX, boxPixelsY)); // This allows us to specify the part of texture that we are using (used for handling sprite sheets)
+
+    //Flowers Texture and Sprite
+
+    const int maxFlowers = 37;
+    Sprite flowerSprites[maxFlowers];
+
+    Texture flowerTexture;
+    flowerTexture.loadFromFile("Textures/obstacles.png");
+
+    int flowerCount = 0;
+    bool flower_exists[37] = { false };
+    static bool firstleft = true;
+    static bool firstright = true;
+
+
+
+
+
+    // The ground on which the player moves
+    RectangleShape groundRectangle(Vector2f(960, 64));// 960 is the width and 64 is the height
+    groundRectangle.setPosition(0, (gameRows - 2) * boxPixelsY);
+    groundRectangle.setFillColor(Color::Green);
+    // Bees
+    const int maxBees = 20;   // For Level 3
+    int bee_x[maxBees] = { false }, bee_y[maxBees] = { false };  // 2 arrays of size 20 each
+    bool bee_exists[maxBees] = { false }; // boolean array for representing the existence of each bee
+    int bee_direction[maxBees] = { 1 };  // 1 for right, -1 for left
+    int bee_spawned = 0;   // counter for number of bees
+    int lastSpawnTime = 0; // last spawning time of bee
+    Clock spawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock beePauseClocks[maxBees];
+    bool bee_paused[maxBees] = { false };
+    int bee_pause_timer[maxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture beeTexture;
+    Sprite beeSprite;
+    beeTexture.loadFromFile("Textures/Regular_bee.png");
+    beeSprite.setTexture(beeTexture);
+
+
+    //Fast Bees
+    const int fastmaxBees = 15;   // For Level 1
+    int fastBee_x[fastmaxBees] = { false };
+    int fastBee_y[fastmaxBees] = { false };  // 2 arrays of size 20 each
+    bool fastBee_exists[fastmaxBees] = { false }; // boolean array for representing the existence of each bee
+    int fastBee_direction[fastmaxBees] = { 1 };  // 1 for right, -1 for left
+    int fastBee_spawned = 0;   // counter for number of bees
+    int fastlastSpawnTime = 0; // last spawning time of bee
+    Clock fastspawnClock;      // The clock has started counting time automatically
+    // Pause Logic
+    Clock fastBeePauseClocks[fastmaxBees];
+    bool fastBee_paused[fastmaxBees] = { false };
+    int fastBee_pause_timer[fastmaxBees] = { 0 };
+
+    // Initializing bee and bee sprites
+    Texture fastBeeTexture;
+    Sprite fastBeeSprite;
+    fastBeeTexture.loadFromFile("Textures/Fast_bee.png");
+    fastBeeSprite.setTexture(fastBeeTexture);
+
+   
+    // Beehives
+    const int maxHives = 20;
+    float hive_x[maxHives] = { 0 };
+    float hive_y[maxHives] = { 0 };
+    int hive_count = 0;
+    bool hive_exists[maxHives] = { false };
+    Texture hiveTexture;
+    Sprite hiveSprites[maxHives];
+    hiveTexture.loadFromFile("Textures/hive.png");
+    for (int i = 0; i < maxHives; i++) {
+        hiveSprites[i].setTexture(hiveTexture);
+    }
+    // pregenerated
+    float prehive_x[5] = { 0 };
+    float prehive_y[5] = { 0 };
+    Texture prehiveTexture;
+    Sprite prehiveSprite;
+    prehiveTexture.loadFromFile("Textures/hive.png");
+    prehiveSprite.setTexture(prehiveTexture);
+    const int maxPreHive = 5;
+    bool prehive_exists[maxPreHive] = { true,true,true,true,true };
+    // Giving them random values
+    for (int i = 0; i < 5; i++) {
+        prehive_x[i] = rand() % (resolutionX - boxPixelsX - 100) + 50;
+        prehive_y[i] = rand() % (resolutionY / 2 - boxPixelsY); //Dont want them to spawn at lower half
+
+    }
+
+
+
+
+
+
+
+    // Humming Bird
+    float bird_x;
+    float bird_y;
+    bool bird_exists = false;
+    int bird_direction_x = 0;
+    int bird_direction_y = 0;
+    int bird_health = 3;
+    bool bird_paused = false;
+    Clock bird_clock;
+    int bird_pause_timer;
+    Clock bird_pause_clock;
+    int bird_movement_counter = 0;
+    Clock respawn_clock;
+    int bird_hit_count = 0;
+    float respawn_timer;
+
+    // Hummingbird Texture and Sprite
+    Texture birdTexture;
+    Sprite birdSprite;
+    birdTexture.loadFromFile("Textures/bird.png");
+    birdSprite.setTexture(birdTexture);
+    birdSprite.setScale(2, 2);
+
+    // Declaring the clock for movement
+    Clock movementClock;
+    Clock shootClock;
+    int beeAnimFrame[maxBees] = { 0 };
+    Clock beeAnimClocks[maxBees];
+
+    
+
+    int maxPowerUps = 10;
+    int powerUpType[10];
+    float powerUpX[10];
+    float powerUpY[10];
+    bool powerUpExists[10];
+    Clock powerUpDropClock[10];
+
+    int activePowerUp = 0;
+    Clock powerUpEffectClock;
+    float powerUpDuration = 5.0;
+    bool powerUpActive = false;
+
+    Texture speedUpTexture, speedDownTexture, heightUpTexture, heightDownTexture;
+    speedUpTexture.loadFromFile("Textures/speed_Inc.png");
+    speedDownTexture.loadFromFile("Textures/speed_Dec.png");
+    heightUpTexture.loadFromFile("Textures/height_Inc.png");
+    heightDownTexture.loadFromFile("Textures/height_Dec.png");
+    Sprite speedUpSprite;
+    Sprite speedDownSprite;
+    Sprite heightUpSprite;
+    Sprite heightDownSprite;
+	speedUpSprite.setTexture(speedUpTexture);
+	speedDownSprite.setTexture(speedDownTexture);
+	heightUpSprite.setTexture(heightUpTexture);
+	heightDownSprite.setTexture(heightDownTexture);
+	  
+	
+
+
+    while (window.isOpen()) {
+        if (backToMainMenu(window)) {
+            return 0;  // Return to Main Menu
+        }
+
+        //Background
+        window.draw(background4Sprite);
+        float moveDelay = 100; // default ms
+        float height = 32; 
+
+        if (powerUpActive) {
+            if (activePowerUp == 1) moveDelay = 50; // Speed up
+            if (activePowerUp == 2) moveDelay = 200; // Speed down
+            if (activePowerUp == 3) height = 48; // Height up
+            if (activePowerUp == 4) height = 16; // Height down
+
+            // Timer bar logic (draw a rectangle above player, for example)
+            float timeLeft = powerUpDuration - powerUpEffectClock.getElapsedTime().asSeconds();
+            if (timeLeft < 0) {
+                powerUpActive = false;
+                activePowerUp = 0;
+            }
+
+        }
+        // Movement in grid
+        if (movementClock.getElapsedTime().asMilliseconds() > moveDelay) { // Delay of 0.1 sec
+            // For left movement
+            if (Keyboard::isKeyPressed(Keyboard::Left) && playerGridX > 0 && gameGrid[playerGridY][playerGridX - 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX--; // Move left
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            // For right movement
+            else if (Keyboard::isKeyPressed(Keyboard::Right) && playerGridX < gameColumns - 1 && gameGrid[playerGridY][playerGridX + 1] != 2) {
+                gameGrid[playerGridY][playerGridX] = 0; // Clear previous position
+                playerGridX++; // Move right
+                gameGrid[playerGridY][playerGridX] = 1; // Update position
+
+            }
+            movementClock.restart(); // Reset clock
+        }
+
+
+        if ((gameGrid[playerGridY][playerGridX - 1] == 2) && (gameGrid[playerGridY][playerGridX + 1] == 2)) {
+
+            // Jumping
+            for (int i = 0; i < gameColumns; i++) {
+                if (playerGridX - i >= 0 && gameGrid[playerGridY][playerGridX - i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX - i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+                if (playerGridX + i < gameColumns && gameGrid[playerGridY][playerGridX + i] == 0) {
+                    gameGrid[playerGridY][playerGridX] = 0;
+                    playerGridX = playerGridX + i;
+                    gameGrid[playerGridY][playerGridX] = 1;
+
+                    break;
+                }
+
+            }
+        }
+
+        if (powerUpActive) {
+            float barWidth = 60 * (powerUpDuration - powerUpEffectClock.getElapsedTime().asSeconds()) / powerUpDuration;
+            RectangleShape timerBar(Vector2f(barWidth, 8));
+            timerBar.setFillColor(Color::Green);
+            timerBar.setPosition(player_x, player_y - 12);
+            window.draw(timerBar);
+        }
+
+
+        //cout<<gameGrid[16][15]<<endl;
+        //cout<<gameGrid[16][14]<<endl;
+        //cout<<gameGrid[16][16]<<endl;
+        //cout<<"player x"<<player_x<<endl;
+        //cout<<"player y"<<player_y<<endl;
+
+        // For shooting
+        if (shootClock.getElapsedTime().asMilliseconds() > 500) {
+            if (Keyboard::isKeyPressed(Keyboard::Space) && !bullet_exists) {
+                bullet_exists = true;
+                // Positioning of bullet along x and y axis
+                bullet_x = player_x + boxPixelsX / 2; // Positioning the bullet with the center of spray can
+                bullet_y = player_y;
+                bullet_counter++; // Incrementing the counter each time the bullet is fired
+                if (bullet_counter <= 56) {
+                    can1--;
+                }
+                if (bullet_counter > 57 && bullet_counter <= 112) {
+                    can2--;
+                }
+                if (bullet_counter > 113 && bullet_counter <= 169) {
+                    can3--;
+                }
+
+
+
+
+                shootClock.restart(); // Reset clock
+            }
+        }
+
+        // Update player position in pixels
+        player_x = playerGridX * boxPixelsX;
+        player_y = playerGridY * boxPixelsY;
+
+        for (int i = 0; i < maxPowerUps; i++) {
+    if (powerUpExists[i]) {
+        // Simple collision check (adjust size if needed)
+        if ((player_x + boxPixelsX > powerUpX[i] && player_x < powerUpX[i] + 32 &&
+                    player_y + boxPixelsY > powerUpY[i] && player_y < powerUpY[i] + 32) || (
+            player_x + boxPixelsX > powerUpX[i] && player_x < powerUpX[i] + 32)) {
+
+            // If same power-up, reset timer
+            if (activePowerUp == powerUpType[i]) {
+                powerUpEffectClock.restart();
+            }
+            // If opposite, cancel both
+            else if ((activePowerUp == 1 && powerUpType[i] == 2) || (activePowerUp == 2 && powerUpType[i] == 1) ||
+                     (activePowerUp == 3 && powerUpType[i] == 4) || (activePowerUp == 4 && powerUpType[i] == 3)) {
+                activePowerUp = 0;
+                powerUpActive = false;
+            }
+            // Otherwise, apply new power-up
+            else {
+                activePowerUp = powerUpType[i];
+                powerUpEffectClock.restart();
+                powerUpActive = true;
+            }
+            powerUpExists[i] = false;
+        }
+    }
+}
+        
+
+        collisonWithBullets(bee_x, bee_y, bullet_exists, bee_exists, bullet_x, bullet_y, maxBees, sound, honeycomb_x, honeycomb_y, honeycomb_exists, maxHoneycombs, prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists, maxPreHoneycombs, playerScore, hive_x, hive_y, hive_exists, prehive_x, prehive_y, prehive_exists, maxPreHive, fastmaxBees, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, fastBee_exists, fastBee_x, fastBee_y, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        // Collision with Prehoneycombs
+        collisonWithPreHoneycomb(window, bee_x, bee_y, prehoneycomb_x, prehoneycomb_y, bee_exists, bee_direction, maxBees, prehoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxPreHoneycombs, maxHives);
+        // Collision with honeycombs
+        collisonWithHoneycomb(window, bee_x, bee_y, honeycomb_x, honeycomb_y, bee_exists, bee_direction, maxBees, honeycomb_exists, hive_x, hive_y, hive_count, hive_exists, maxHoneycombs, maxHives);
+        //Collision with red
+        collisonWithFastHoneycomb(window, bee_x, bee_y, fasthoneycomb_x, fasthoneycomb_y, bee_exists, bee_direction, maxBees, fasthoneycomb_exists, hive_x, hive_y, hive_count, hive_exists, fastMaxHoneycombs, maxHives);
+        // collision with hives
+        collisonWithHive(window, bee_x, bee_y, hive_x, hive_y, bee_exists, bee_direction, maxBees, hive_exists);
+        collisonWithPreHive(window, bee_x, bee_y, prehive_x, prehive_y, bee_exists, bee_direction, maxBees, prehive_exists);
+        
+        // Calling drawHoneycomb function
+        drawHoneycomb(window, honeycomb_x, honeycomb_y, honeycombSprite, honeycomb_exists, prehoneycomb_x, prehoneycomb_y, prehoneycombSprite, prehoneycomb_exists, maxHoneycombs, maxPreHoneycombs);
+        // Drawing red honeycombs
+        drawFastHoneycomb(window, fasthoneycomb_x, fasthoneycomb_y, fasthoneycombSprite, fasthoneycomb_exists, fastMaxHoneycombs);
+
+        // Calling spawnBee function
+        spawnBee(bee_x, bee_y, bee_exists, bee_direction, bee_spawned, spawnClock, lastSpawnTime, maxBees);
+        drawBee(window, bee_x, bee_y, beeSprite, bee_exists, bee_direction, maxBees, bee_paused, bee_pause_timer, beePauseClocks, beeAnimFrame, beeAnimClocks);
+        // Fast Bees
+        spawnFastBee(fastBee_x, fastBee_y, fastBee_exists, fastBee_direction, fastBee_spawned, fastspawnClock, fastlastSpawnTime, fastmaxBees);
+        drawFastBee(window, fastBee_x, fastBee_y, fastBeeSprite, fastBee_exists, fastBee_direction, fastmaxBees, fastBee_paused, fastBee_pause_timer, fastBeePauseClocks);
+        
+        // Draw Humming bird
+        spawnbird(bird_exists, bird_clock, bird_x, bird_y);
+        drawbird(window, bird_x, bird_y, birdSprite, bird_exists, bird_direction_x, bird_direction_y, bird_clock);
+        movebird(bird_x, bird_y, bird_pause_clock, bird_pause_timer, bird_exists, bird_paused, bird_direction_x, bird_direction_y);
+        hummingbirdInteractWithHoneycomb(
+            bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer,
+            honeycomb_x, honeycomb_y, honeycomb_exists,
+            prehoneycomb_x, prehoneycomb_y, prehoneycomb_exists,
+            maxHoneycombs, maxPreHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        handleHummingbirdCollision(bird_x, bird_y, bullet_exists, bird_exists, bullet_x, bullet_y, sound, bird_health, bird_hit_count, respawn_timer, respawn_clock, birdSprite);
+        hummingbirdInteractWithRedHoneycomb(bird_x, bird_y, bird_exists, bird_paused, bird_pause_clock, bird_pause_timer, fasthoneycomb_x, fasthoneycomb_y, fasthoneycomb_exists, fastMaxHoneycombs, playerScore, maxPowerUps, powerUpType, powerUpX, powerUpY, powerUpExists, powerUpDropClock);
+        drawHives(window, hiveSprites, hive_exists, hive_x, hive_y, hive_count, prehive_x, prehive_y, prehiveSprite, prehive_exists, maxPreHive);
+
+        // Calling beehive function
+
+
+        if (bullet_exists) {
+            moveBullet(bullet_y, bullet_exists, bulletClock);
+            drawBullet(window, bullet_x, bullet_y, bulletSprite);
+        }
+        else {
+
+            bullet_x = player_x;
+            bullet_y = player_y;
+        }
+
+        // Calling drawPlayer function
+        drawPlayer(window, player_x, player_y, playerSprite, sprayLevelSprite, powerUpActive, activePowerUp);
+
+
+
+        window.draw(groundRectangle);// Order is important
+        // Showing spray cans
+        if (bullet_counter <= 56) {
+            window.draw(ammoSprite2); // Drawing Ammo1
+
+
+        }
+        if (bullet_counter <= 112) {
+            window.draw(ammoSprite1); // Drawing Ammo2
+
+        }
+        if (bullet_counter > 56 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 0;
+        }
+        if (bullet_counter > 112 && (playerScore == 20000 || playerScore == 40000 || playerScore == 80000)) {
+            bullet_counter = 57;
+        }
+
+
+        // Displaying Score
+        scoreText.setString(std::to_string(playerScore));
+        window.draw(scoreText);
+
+        // Displaying Spray left
+        can1Text.setString("Spray Left: " + std::to_string(can1));
+        can2Text.setString("Spray Left: " + std::to_string(can2));
+        can3Text.setString("Spray Left: " + std::to_string(can3));
+
+        if (bullet_counter <= 56) {
+            window.draw(can1Text);
+        }
+        if (bullet_counter > 56 && bullet_counter <= 112) {
+            window.draw(can2Text);
+        }
+        if (bullet_counter > 112) {
+            window.draw(can3Text);
+        }
+
+
+        // Decreases the level after every 8 bullets are fired
+        if (bullet_counter == 0) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 8) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 16) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 24) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 32) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 40) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 48) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 56) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        if (bullet_counter == 57) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 65) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 73) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 81) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 89) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 97) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 105) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+
+        if (bullet_counter == 106) {
+            sprayLevelSprite.setTextureRect(IntRect(0, 0, 64, 64));
+        }
+        if (bullet_counter == 114) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -5, 64, 64));
+        }
+        if (bullet_counter == 122) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -10, 64, 64));
+        }
+        if (bullet_counter == 130) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -15, 64, 64));
+        }
+        if (bullet_counter == 138) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -20, 64, 64));
+        }
+        if (bullet_counter == 146) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -25, 64, 64));
+        }
+        if (bullet_counter == 154) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -30, 64, 64));
+        }
+        if (bullet_counter == 162) {
+            sprayLevelSprite.setTextureRect(IntRect(0, -35, 64, 64));
+        }
+        // Spawning Flowers
+        spawnFlower(window, bee_x, bee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, maxBees, bee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+        // fast spawning
+        spawnFastFlower(window, fastBee_x, fastBee_y, gameGrid, flowerSprites, flowerCount, flowerTexture, fastmaxBees, fastBee_exists, flower_exists, playerGridX, firstleft, firstright, maxFlowers);
+
+        // Drawing Flowers
+        for (int i = 0; i < flowerCount; i++) {
+            if (flower_exists[i]) {
+                window.draw(flowerSprites[i]);
+            }
+        }
+        bool levelComplete = checklevel(bee_spawned, maxBees, bee_exists);
+        if (levelComplete) {
+            for (int i = 0; i < maxHives; i++) {
+                if (hive_exists[i]) {
+                    if (hive_y[i] >= 0 && hive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (hive_y[i] >= 64 && hive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (hive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+            for (int i = 0; i < maxPreHive; i++) {
+                if (prehive_exists[i]) {
+                    if (prehive_y[i] >= 0 && prehive_y[i] < 64) {
+                        playerScore += 2000;
+                    }
+                    if (prehive_y[i] >= 64 && prehive_y[i] < 192) {
+                        playerScore += 1600;
+                    }
+                    if (prehive_y[i] > 192) {
+                        playerScore += 1000;
+                    }
+                }
+            }
+            updateHighScores(playerScore, highscores, playerNames, window);
+            nextlevel = true;
+            bgMusic.stop();
+            return 0;
+
+        }
+
+        if (can3 == 0 || (flowerCount > 29)) {
+            updateHighScores(playerScore, highscores, playerNames, window);
+            playerScore = 0;
+            bullet_counter = 0;
+            nextlevel = false;
+
+            return 0;
+        }
+        for (int i = 0; i < maxPowerUps; i++) {
+            if (powerUpExists[i]) {
+                // Check if not on ground 
+                float groundY = (gameRows - 2) * boxPixelsY - 32; // 32 is the power-up sprite height
+                if (powerUpY[i] < groundY) {
+                    powerUpY[i] += 1; 
+                    if (powerUpY[i] > groundY) powerUpY[i] = groundY;
+                }
+            }
+        }
+        for (int i = 0; i < maxPowerUps; i++) {
+            if (powerUpExists[i]) {
+                // Draw the correct sprite
+                if (powerUpType[i] == 1) { speedUpSprite.setPosition(powerUpX[i], powerUpY[i]); window.draw(speedUpSprite); }
+                if (powerUpType[i] == 2) { speedDownSprite.setPosition(powerUpX[i], powerUpY[i]); window.draw(speedDownSprite); }
+                if (powerUpType[i] == 3) { heightUpSprite.setPosition(powerUpX[i], powerUpY[i]); window.draw(heightUpSprite); }
+                if (powerUpType[i] == 4) { heightDownSprite.setPosition(powerUpX[i], powerUpY[i]); window.draw(heightDownSprite); }
+
+                // Remove if time expired
+                if (powerUpDropClock[i].getElapsedTime().asSeconds() > 7.0f) // 7 seconds on ground
+                    powerUpExists[i] = false;
+            }
+        }
+        window.display(); // Displays everything that was added by window.draw()
+        window.clear(); // Clears everything from the frame so that there is no overlapping of content in the next frame
+    }
+    return 0;
+}
+
+// Function Definitions
+
+
+
+
+bool checklevel(int bee_spawned, int maxBees, bool bee_exists[]) {
+
+    if (bee_spawned < maxBees) {
+        return false;
+    }
+
+
+    for (int i = 0; i < maxBees; i++) {
+        if (bee_exists[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+
+void drawPlayer(RenderWindow& window, float& player_x, float& player_y, Sprite& playerSprite, Sprite& sprayLevelSprite, bool powerUpActive, int activePowerUp) {
+    if (powerUpActive) {
+        if (activePowerUp == 3) {     // Height up
+            
+            playerSprite.setPosition(player_x, player_y - 32);
+            sprayLevelSprite.setPosition(player_x, player_y - 32);
+            Texture extraTexture;
+            Sprite extraSprite;
+            extraTexture.loadFromFile("Textures/extra.png");
+            extraSprite.setTexture(extraTexture);
+            extraSprite.setPosition(player_x + 16, player_y + 32);
+            window.draw(extraSprite);
+            window.draw(playerSprite);
+            window.draw(sprayLevelSprite);
+        }
+        else if (activePowerUp == 4) { // Height down
+            
+            
+            playerSprite.setPosition(player_x, player_y + 16);
+            sprayLevelSprite.setPosition(player_x, player_y + 16);
+            window.draw(playerSprite);
+            window.draw(sprayLevelSprite);
+        }
+        else {
+    playerSprite.setPosition(player_x, player_y);
+    window.draw(playerSprite);
+    sprayLevelSprite.setPosition(player_x, player_y);
+    window.draw(sprayLevelSprite);
+        }
+
+    }
+    else {
+        playerSprite.setPosition(player_x, player_y);
+        window.draw(playerSprite);
+        sprayLevelSprite.setPosition(player_x, player_y);
+        window.draw(sprayLevelSprite);
+
+    }
+
+
+}
+
+void moveBullet(float& bullet_y, bool& bullet_exists, Clock& bulletClock) {
+    if (bulletClock.getElapsedTime().asMilliseconds() < 5) {
+        return; // If time passed is less than 5 milliseconds, then the function will return immediately and no bullet will be moved
+    }
+    bulletClock.restart(); // Resetting the clock so that the timer starts again for next call
+
+
+    bullet_y -= 10;  // Bullet y was equal to player y and subtracting 10 from it will move the bullet upwards
+
+
+    if (bullet_y < -32) // -32 because we want the whole bullet to leave the screen and one boxPixel is of 32 pixcels
+        bullet_exists = false;
+}
+
+void drawBullet(RenderWindow& window, float& bullet_x, float& bullet_y, Sprite& bulletSprite) {
+    bulletSprite.setPosition(bullet_x, bullet_y);
+    window.draw(bulletSprite);
+}
+void spawnBee(int bee_x[], int bee_y[], bool bee_exists[], int bee_direction[], int& bee_spawned, Clock& spawnClock, int& lastSpawnTime, int maxBees) {
+
+    int currentTime = spawnClock.getElapsedTime().asMilliseconds();
+    static int randomTime = (rand() % 5001) + 10;
+    if (currentTime - lastSpawnTime >= randomTime) { // ((rand() % 5001) + 1000) generates a time interval between 1000ms and 5000ms (1 sec to 5 sec) and we are checking if the current time is greater by last spawned time by this limit
+
+
+
+        if (bee_spawned < maxBees) {
+            bool spawn_left = rand() % 2; // will give 0 and 1 values
+            bee_y[bee_spawned] = 0; // Start from the top of the screen
+            if (spawn_left) {
+                bee_x[bee_spawned] = 0;  // spawn from left
+                bee_direction[bee_spawned] = 1; // Move Right
+            }
+            else {
+                bee_x[bee_spawned] = resolutionX - beeSpriteWidth; // Spawn from right
+                bee_direction[bee_spawned] = -1; // Move towards left
+            }
+            bee_exists[bee_spawned] = true;
+
+            bee_spawned++;
+            lastSpawnTime = currentTime;
+            randomTime = (rand() % 3001) + 50;
+        }
+
+    }
+}
+
+
+void drawBee(RenderWindow& window, int bee_x[], int bee_y[], Sprite& beeSprite, bool bee_exists[],
+    int bee_direction[], int maxBees, bool bee_paused[], int bee_pause_timer[], Clock beePauseClocks[], int beeAnimFrame[], Clock beeAnimClocks[]) {
+
+    for (int i = 0; i < maxBees; i++) {
+        if (bee_exists[i]) {
+
+            if (bee_paused[i]) {
+
+                if (beePauseClocks[i].getElapsedTime().asMilliseconds() >= bee_pause_timer[i]) {
+                    bee_paused[i] = false;
+                    beePauseClocks[i].restart();
+                }
+            }
+            else {
+
+                bee_x[i] += bee_direction[i];
+                
+                if (bee_x[i] <= 0 || bee_x[i] >= resolutionX - beeSpriteWidth) {
+                    bee_direction[i] = -bee_direction[i]; // Reverse direction
+
+                    bee_y[i] += beeSpriteHeight; // Drop to the next tier
+                }
+
+
+
+                // Randomly trigger a pause
+                if (rand() % 4000 < 4) {
+                    bee_paused[i] = true;
+                    bee_pause_timer[i] = (rand() % 2001) + 1500; // Pause for 1.5 to 3.5s
+                    beePauseClocks[i].restart();
+                }
+            }
+            // Set the bee's texture and scale based on its direction
+            beeSprite.setTextureRect(IntRect(0, 0, beeSpriteWidth, beeSpriteHeight)); // Always use positive width
+            if (bee_direction[i] == -1) { // Moving left
+                beeSprite.setScale(1, 1); // Normal orientation
+                beeSprite.setPosition(bee_x[i], bee_y[i]);
+            }
+            else if (bee_direction[i] == 1) { // Moving right
+                beeSprite.setScale(-1, 1); // Flipped horizontally
+                beeSprite.setPosition(bee_x[i] + beeSpriteWidth, bee_y[i]); // Adjust position
+            }
+            window.draw(beeSprite);
+        }
+    }
+}
+
+
+
+
+
+
+void spawnFastBee(int fastBee_x[], int fastBee_y[], bool fastBee_exists[], int fastBee_direction[], int& fastBee_spawned, Clock& fastspawnClock, int& fastlastSpawnTime, int fastmaxBees) {
+
+    int fastcurrentTime = fastspawnClock.getElapsedTime().asMilliseconds();
+    static int fastrandomTime = (rand() % 5001) + 10;
+    if (fastcurrentTime - fastlastSpawnTime >= fastrandomTime) { // ((rand() % 3001) + 1000) generates a time interval between 1000ms and 3000ms (1 sec to 3 sec) and we are checking if the current time is greater by last spawned time by this limit
+
+
+
+        if (fastBee_spawned < fastmaxBees) {
+            bool fastspawn_left = rand() % 2; // will give 0 and 1 values
+            fastBee_y[fastBee_spawned] = 0; // Start from the top of the screen
+            if (fastspawn_left) {
+                fastBee_x[fastBee_spawned] = 0;  // spawn from left
+                fastBee_direction[fastBee_spawned] = 1; // Move Right
+            }
+            else {
+                fastBee_x[fastBee_spawned] = resolutionX - beeSpriteWidth; // Spawn from right
+                fastBee_direction[fastBee_spawned] = -1; // Move towards left
+            }
+            fastBee_exists[fastBee_spawned] = true; // Mark bee as existing
+
+            fastBee_spawned++; // Increment the spawn count
+            fastlastSpawnTime = fastcurrentTime;
+            fastrandomTime = (rand() % 3001) + 50;
+        }
+
+    }
+}
+
+
+void drawFastBee(RenderWindow& window, int fastBee_x[], int fastBee_y[], Sprite& fastBeeSprite, bool fastBee_exists[], int fastBee_direction[], int fastmaxBees, bool fastBee_paused[], int fastBee_pause_timer[], Clock fastBeePauseClocks[]) {
+
+    for (int i = 0; i < fastmaxBees; i++) {
+        if (fastBee_exists[i]) {
+
+            fastBee_x[i] += fastBee_direction[i];
+
+            if (fastBee_x[i] <= 0 || fastBee_x[i] >= resolutionX - beeSpriteWidth) {
+                fastBee_direction[i] = -fastBee_direction[i]; // Reverse direction
+                fastBee_y[i] += beeSpriteHeight; // Drop to the next tier
+            }
+            
+            // Set the bee's texture and scale based on its direction
+            fastBeeSprite.setTextureRect(IntRect(0, 0, beeSpriteWidth, beeSpriteHeight)); // Always use positive width
+            if (fastBee_direction[i] == -1) { // Moving left
+                fastBeeSprite.setScale(1, 1); // Normal orientation
+                fastBeeSprite.setPosition(fastBee_x[i], fastBee_y[i]);
+            }
+            else if (fastBee_direction[i] == 1) { // Moving right
+                fastBeeSprite.setScale(-1, 1); // Flipped horizontally
+                fastBeeSprite.setPosition(fastBee_x[i] + beeSpriteWidth, fastBee_y[i]); // Adjust position
+            }
+            window.draw(fastBeeSprite);
+        }
+    }
+}
+
+
+
+
+void drawFastHoneycomb(RenderWindow& window, float fasthoneycomb_x[], float fasthoneycomb_y[], Sprite& fasthoneycombSprite, bool fasthoneycomb_exists[], int fastMaxHoneycombs) {
+    for (int i = 0; i < fastMaxHoneycombs; i++) {
+        if (fasthoneycomb_exists[i]) {
+            fasthoneycombSprite.setPosition(fasthoneycomb_x[i], fasthoneycomb_y[i]);
+            window.draw(fasthoneycombSprite);
+        }
+    }
+
+}
+
+
+
+void drawHoneycomb(RenderWindow& window, float honeycomb_x[], float honeycomb_y[], Sprite& honeycombSprite, bool honeycomb_exists[], float prehoneycomb_x[], float prehoneycomb_y[], Sprite& prehoneycombSprite, bool prehoneycomb_exists[], int maxHoneycombs, int maxPreHoneycombs) {
+    for (int i = 0; i < maxHoneycombs; i++) {
+        if (honeycomb_exists[i]) {
+            honeycombSprite.setPosition(honeycomb_x[i], honeycomb_y[i]);
+            window.draw(honeycombSprite);
+        }
+    }
+    for (int i = 0; i < maxPreHoneycombs; i++) {
+        if (prehoneycomb_exists[i]) {
+            prehoneycombSprite.setPosition(prehoneycomb_x[i], prehoneycomb_y[i]);
+            window.draw(prehoneycombSprite);
+
+        }
+    }
+}
+
+
+// function to detect collison of bees with honeycombs
+void collisonWithPreHoneycomb(RenderWindow& window, int bee_x[], int bee_y[], float prehoneycomb_x[], float prehoneycomb_y[], bool bee_exists[], int bee_direction[], int maxBees, bool prehoneycomb_exists[], float hive_x[], float hive_y[], int& hive_count, bool hive_exists[], int maxPreHoneycombs, int maxHives) {
+    for (int i = 0; i < maxPreHoneycombs; i++) {
+        for (int j = 0; j < maxBees; j++) {
+            if (bee_exists[j] && prehoneycomb_exists[i]) {
+
+                if (bee_x[j] < prehoneycomb_x[i] + 64 && bee_x[j] + 32 > prehoneycomb_x[i] && bee_y[j] + 32 > prehoneycomb_y[i] && bee_y[j] < prehoneycomb_y[i] + 64) {
+                    bee_direction[j] = -bee_direction[j]; // Reverse direction
+
+
+
+
+                    bool hasHoneycombBelow = false, hasHoneycombLeft = false, hasHoneycombRight = false;
+
+                    // Check for honeycomb below
+                    for (int k = 0; k < maxBees; k++) {
+                        if (prehoneycomb_exists[k] &&
+                            bee_y[j] + 32 >= prehoneycomb_y[k] && bee_y[j] + 32 <= prehoneycomb_y[k] + 64 &&
+                            bee_x[j] >= prehoneycomb_x[k] && bee_x[j] + 32 <= prehoneycomb_x[k] + 64) {
+                            hasHoneycombBelow = true;
+                        }
+                    }
+
+                    // Check for honeycomb on the left
+                    for (int k = 0; k < maxBees; k++) {
+                        if (prehoneycomb_exists[k] &&
+                            bee_x[j] > prehoneycomb_x[k] && bee_x[j] < prehoneycomb_x[k] + 64 &&
+                            bee_y[j] >= prehoneycomb_y[k] && bee_y[j] + 32 <= prehoneycomb_y[k] + 64) {
+                            hasHoneycombLeft = true;
+                        }
+                    }
+
+                    // Check for honeycomb on the right
+                    for (int k = 0; k < maxBees; k++) {
+                        if (prehoneycomb_exists[k] &&
+                            bee_x[j] + 32 > prehoneycomb_x[k] && bee_x[j] + 32 < prehoneycomb_x[k] + 64 &&
+                            bee_y[j] >= prehoneycomb_y[k] && bee_y[j] + 32 <= prehoneycomb_y[k] + 64) {
+                            hasHoneycombRight = true;
+                        }
+                    }
+
+
+                    if (((bee_x[j] <= 0 || bee_x[j] + 32 >= resolutionX - 32) && hasHoneycombBelow && (hasHoneycombLeft || hasHoneycombRight)) || hasHoneycombLeft && hasHoneycombRight && hasHoneycombBelow) {
+                        if (hive_count < maxHives) {
+                            hive_exists[hive_count] = true;
+                            hive_x[hive_count] = bee_x[j];
+                            hive_y[hive_count] = bee_y[j];
+                            hive_count++;
+                            bee_exists[j] = false;
+                        }
+                    }
+                    else {
+                        bee_y[j] += boxPixelsY;
+                    }
+                }
+
+            }
+        }
+    }
+}
+void collisonWithHoneycomb(RenderWindow& window, int bee_x[], int bee_y[], float honeycomb_x[], float honeycomb_y[], bool bee_exists[], int bee_direction[], int maxBees, bool honeycomb_exists[], float hive_x[], float hive_y[], int& hive_count, bool hive_exists[], int maxHoneycombs, int maxHives) {
+    for (int i = 0; i < maxBees; i++) {
+        for (int j = 0; j < maxBees; j++) {
+            if (bee_exists[j] && honeycomb_exists[i]) {
+
+                if (bee_x[j] < honeycomb_x[i] + 64 && bee_x[j] + 32 > honeycomb_x[i] && bee_y[j] + 32 > honeycomb_y[i] && bee_y[j] < honeycomb_y[i] + 64) {
+                    bee_direction[j] = -bee_direction[j]; // Reverse direction
+
+
+                    bool hasHoneycombBelow = false, hasHoneycombLeft = false, hasHoneycombRight = false;
+
+                    // Check for honeycomb below
+                    for (int k = 0; k < maxHoneycombs; k++) {
+                        if (honeycomb_exists[k] &&
+                            bee_y[j] + 32 >= honeycomb_y[k] && bee_y[j] + 32 <= honeycomb_y[k] + 64 &&
+                            bee_x[j] >= honeycomb_x[k] && bee_x[j] + 32 <= honeycomb_x[k] + 64) {
+                            hasHoneycombBelow = true;
+                        }
+                    }
+
+                    // Check for honeycomb on the left
+                    for (int k = 0; k < maxHoneycombs; k++) {
+                        if (honeycomb_exists[k] &&
+                            bee_x[j] > honeycomb_x[k] && bee_x[j] < honeycomb_x[k] + 64 &&
+                            bee_y[j] >= honeycomb_y[k] && bee_y[j] + 32 <= honeycomb_y[k] + 64) {
+                            hasHoneycombLeft = true;
+                        }
+                    }
+
+                    // Check for honeycomb on the right
+                    for (int k = 0; k < maxHoneycombs; k++) {
+                        if (honeycomb_exists[k] &&
+                            bee_x[j] + 32 > honeycomb_x[k] && bee_x[j] + 32 < honeycomb_x[k] + 64 &&
+                            bee_y[j] >= honeycomb_y[k] && bee_y[j] + 32 <= honeycomb_y[k] + 64) {
+                            hasHoneycombRight = true;
+                        }
+                    }
+
+
+                    if (((bee_x[j] <= 0 || bee_x[j] + 32 >= resolutionX - 32) && hasHoneycombBelow && (hasHoneycombLeft || hasHoneycombRight)) || hasHoneycombLeft && hasHoneycombRight && hasHoneycombBelow) {
+                        if (hive_count < maxHives) {
+                            hive_exists[hive_count] = true;
+                            hive_x[hive_count] = bee_x[j];
+                            hive_y[hive_count] = bee_y[j];
+                            hive_count++;
+                            bee_exists[j] = false;
+                        }
+                    }
+                    else {
+                        bee_y[j] += boxPixelsY;
+                    }
+
+                }
+
+            }
+        }
+    }
+
+}
+void collisonWithFastHoneycomb(RenderWindow& window, int bee_x[], int bee_y[], float fasthoneycomb_x[], float fasthoneycomb_y[], bool bee_exists[], int bee_direction[], int maxBees, bool fasthoneycomb_exists[], float hive_x[], float hive_y[], int& hive_count, bool hive_exists[], int fastMaxHoneycombs, int maxHives) {
+    for (int i = 0; i < maxBees; i++) {
+        for (int j = 0; j < maxBees; j++) {
+            if (bee_exists[j] && fasthoneycomb_exists[i]) {
+
+                if (bee_x[j] < fasthoneycomb_x[i] + 64 && bee_x[j] + 32 > fasthoneycomb_x[i] && bee_y[j] + 32 > fasthoneycomb_y[i] && bee_y[j] < fasthoneycomb_y[i] + 64) {
+                    bee_direction[j] = -bee_direction[j]; // Reverse direction
+
+
+                    bool fastHoneycombBelow = false, fastHoneycombLeft = false, fastHoneycombRight = false;
+
+                    // Check for honeycomb below
+                    for (int k = 0; k < fastMaxHoneycombs; k++) {
+                        if (fasthoneycomb_exists[k] &&
+                            bee_y[j] + 32 >= fasthoneycomb_y[k] && bee_y[j] + 32 <= fasthoneycomb_y[k] + 64 &&
+                            bee_x[j] >= fasthoneycomb_x[k] && bee_x[j] + 32 <= fasthoneycomb_x[k] + 64) {
+                            fastHoneycombBelow = true;
+                        }
+                    }
+
+                    // Check for honeycomb on the left
+                    for (int k = 0; k < fastMaxHoneycombs; k++) {
+                        if (fasthoneycomb_exists[k] &&
+                            bee_x[j] > fasthoneycomb_x[k] && bee_x[j] < fasthoneycomb_x[k] + 64 &&
+                            bee_y[j] >= fasthoneycomb_y[k] && bee_y[j] + 32 <= fasthoneycomb_y[k] + 64) {
+                            fastHoneycombLeft = true;
+                        }
+                    }
+
+                    // Check for honeycomb on the right
+                    for (int k = 0; k < fastMaxHoneycombs; k++) {
+                        if (fasthoneycomb_exists[k] &&
+                            bee_x[j] + 32 > fasthoneycomb_x[k] && bee_x[j] + 32 < fasthoneycomb_x[k] + 64 &&
+                            bee_y[j] >= fasthoneycomb_y[k] && bee_y[j] + 32 <= fasthoneycomb_y[k] + 64) {
+                            fastHoneycombRight = true;
+                        }
+                    }
+
+
+                    if (((bee_x[j] <= 0 || bee_x[j] + 32 >= resolutionX - 32) && fastHoneycombBelow && (fastHoneycombLeft || fastHoneycombRight)) || fastHoneycombLeft && fastHoneycombRight && fastHoneycombBelow) {
+                        if (hive_count < maxHives) {
+                            hive_exists[hive_count] = true;
+                            hive_x[hive_count] = bee_x[j];
+                            hive_y[hive_count] = bee_y[j];
+                            hive_count++;
+                            bee_exists[j] = false;
+                        }
+                    }
+                    else {
+                        bee_y[j] += boxPixelsY;
+                    }
+
+                }
+
+            }
+        }
+    }
+
+}
+
+void collisonWithHive(RenderWindow& window, int bee_x[], int bee_y[], float hive_x[], float hive_y[], bool bee_exists[], int bee_direction[], int maxBees, bool hive_exists[]) {
+    for (int i = 0; i < maxBees; i++) {
+        for (int j = 0; j < maxBees; j++) {
+            if (bee_exists[j] && hive_exists[i]) {
+
+                if (bee_x[j] < hive_x[i] + 64 && bee_x[j] + 32 > hive_x[i] && bee_y[j] + 32 > hive_y[i] && bee_y[j] < hive_y[i] + 64) {
+                    bee_direction[j] = -bee_direction[j];
+                    bee_y[j] += boxPixelsY;
+
+                }
+            }
+        }
+    }
+}
+void collisonWithPreHive(RenderWindow& window, int bee_x[], int bee_y[], float prehive_x[], float prehive_y[], bool bee_exists[], int bee_direction[], int maxBees, bool prehive_exists[]) {
+    for (int i = 0; i < maxBees; i++) {
+        for (int j = 0; j < maxBees; j++) {
+            if (bee_exists[j] && prehive_exists[i]) {
+
+                if (bee_x[j] < prehive_x[i] + 64 && bee_x[j] + 32 > prehive_x[i] && bee_y[j] + 32 > prehive_y[i] && bee_y[j] < prehive_y[i] + 64) {
+                    bee_direction[j] = -bee_direction[j];
+                    bee_y[j] += boxPixelsY;
+
+                }
+            }
+        }
+    }
+}
+void collisonWithBullets(int bee_x[], int bee_y[], bool& bullet_exists, bool bee_exists[], float bullet_x, float bullet_y, int maxBees, Sound& sound, float honeycomb_x[], float honeycomb_y[], bool honeycomb_exists[], int maxHoneycombs, float prehoneycomb_x[], float prehoneycomb_y[], bool prehoneycomb_exists[], int maxPreHoneycombs, int& playerScore, float hive_x[], float hive_y[], bool hive_exists[], float prehive_x[], float prehive_y[], bool prehive_exists[], int maxPreHive, int fastmaxBees, float fasthoneycomb_x[], float fasthoneycomb_y[], bool fasthoneycomb_exists[], int fastMaxHoneycombs, bool fastBee_exists[], int fastBee_x[], int fastBee_y[], int maxPowerUps, int powerUpType[], float powerUpX[], float powerUpY[], bool powerUpExists[], Clock powerUpDropClock[]) {
+    // Collision with worker bees
+    for (int i = 0; i < maxBees; i++) {
+        if (bullet_exists && bee_exists[i]) {
+            if (bullet_x + 16 <= bee_x[i] + 32 && bullet_x >= bee_x[i] &&
+                bullet_y <= bee_y[i] + 64 && bullet_y + 16 >= bee_y[i]) {
+                sound.play();
+                bullet_exists = false;
+                bee_exists[i] = false;
+
+
+                honeycomb_x[i] = bee_x[i];
+                honeycomb_y[i] = bee_y[i];
+                honeycomb_exists[i] = true;
+                playerScore += 100;
+
+
+                break;
+            }
+        }
+    }
+    // Check collision with fast bees
+    for (int i = 0; i < fastmaxBees; i++) {
+        if (bullet_exists && fastBee_exists[i]) {
+            if (bullet_x + 16 <= fastBee_x[i] + 32 && bullet_x >= fastBee_x[i] &&
+                bullet_y <= fastBee_y[i] + 64 && bullet_y + 16 >= fastBee_y[i]) {
+                sound.play();
+                bullet_exists = false; // Bullet is "destroyed"
+                fastBee_exists[i] = false; // Bee is "destroyed"
+
+                // Generate honeycomb at bee's position
+                fasthoneycomb_x[i] = fastBee_x[i];
+                fasthoneycomb_y[i] = fastBee_y[i];
+                fasthoneycomb_exists[i] = true;
+                playerScore += 1000;
+
+
+                break;
+            }
+        }
+    }
+
+    // Check collision with honeycombs
+    for (int i = 0; i < maxHoneycombs; i++) {
+        if (bullet_exists && honeycomb_exists[i]) {
+            if (bullet_x + 16 <= honeycomb_x[i] + 64 && bullet_x >= honeycomb_x[i] &&
+                bullet_y <= honeycomb_y[i] + 64 && bullet_y + 16 >= honeycomb_y[i]) {
+                sound.play();
+                bullet_exists = false;
+                honeycomb_exists[i] = false;
+                break;
+            }
+        }
+    }
+
+    // Check collision with prehoneycombs
+    for (int i = 0; i < maxPreHoneycombs; i++) {
+        if (bullet_exists && prehoneycomb_exists[i]) {
+            if (bullet_x + 16 <= prehoneycomb_x[i] + 64 && bullet_x >= prehoneycomb_x[i] &&
+                bullet_y <= prehoneycomb_y[i] + 64 && bullet_y + 16 >= prehoneycomb_y[i]) {
+                sound.play();
+                bullet_exists = false;
+                prehoneycomb_exists[i] = false;
+                break;
+            }
+        }
+    }
+    // Check collision with redhoneycombs
+    for (int i = 0; i < fastMaxHoneycombs; i++) {
+        if (bullet_exists && fasthoneycomb_exists[i]) {
+            if (bullet_x + 16 <= fasthoneycomb_x[i] + 64 && bullet_x >= fasthoneycomb_x[i] &&
+                bullet_y <= fasthoneycomb_y[i] + 64 && bullet_y + 16 >= fasthoneycomb_y[i]) {
+                sound.play();
+                bullet_exists = false; // Bullet is "destroyed"
+                fasthoneycomb_exists[i] = false; // Honeycomb is "destroyed"
+                for (int j = 0; j < maxPowerUps; j++) {
+                    if (!powerUpExists[j]) {
+                        powerUpType[j] = (rand() % 4) + 1; // 1-4
+                        powerUpX[j] = fasthoneycomb_x[i];
+                        powerUpY[j] = fasthoneycomb_y[i];
+                        powerUpExists[j] = true;
+                        powerUpDropClock[j].restart();
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    // Check collision with beehives
+    for (int i = 0; i < maxHoneycombs; i++) {
+        if (bullet_exists && hive_exists[i]) {
+            if (bullet_x + 16 <= hive_x[i] + 64 && bullet_x >= hive_x[i] &&
+                bullet_y <= hive_y[i] + 64 && bullet_y + 16 >= hive_y[i]) {
+                sound.play();
+                bullet_exists = false;
+                hive_exists[i] = false;
+                break;
+            }
+        }
+    }
+    // Check collison with pregenerated beehives
+
+    for (int i = 0; i < maxPreHive; i++) {
+        if (bullet_exists && prehive_exists[i]) {
+            if (bullet_x + 16 <= prehive_x[i] + 64 && bullet_x >= prehive_x[i] &&
+                bullet_y <= prehive_y[i] + 64 && bullet_y + 16 >= prehive_y[i]) {
+                sound.play();
+                bullet_exists = false;
+                prehive_exists[i] = false;
+                break;
+            }
+        }
+    }
+
+
+}
+void spawnFlower(RenderWindow& window, int bee_x[], int bee_y[], int gameGrid[20][30], Sprite flowerSprites[], int& flowerCount, Texture& flowerTexture, int maxBees, bool bee_exists[], bool flower_exists[], int& playerGridX, bool& firstleft, bool& firstright, int maxFlowers) {
+
+    int spawnX = -1;
+    int spawnX2 = -1;
+
+
+
+    for (int i = 0; i < maxBees; i++) {
+        if (bee_y[i] == 512 && bee_exists[i]) {
+            bee_exists[i] = false;
+
+            int beeGridX = (bee_x[i] * 30) / 960;
+
+            if (bee_x[i] <= 0 && firstleft) {  // Left side spawn with two consecutive flowers
+                for (int x = 0; x < 29; ++x) {
+
+                    if (gameGrid[16][x] == 1 && gameGrid[16][x + 1] == 1) {
+
+                        playerGridX += 2;
+                        spawnX = x;
+                        spawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 1 && gameGrid[16][x + 1] == 0) {
+                        playerGridX += 2;
+                        spawnX = x;
+                        spawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x + 1] == 1) {
+                        playerGridX++;
+                        spawnX = x;
+                        spawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x + 1] == 0) {
+                        spawnX = x;
+                        spawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                }
+            }
+            else if (bee_x[i] >= 920 && firstright) {  // Right side spawn with two consecutive flowers
+                for (int x = 29; x > 0; --x) {
+
+                    if (gameGrid[16][x] == 1 && gameGrid[16][x - 1] == 1) {
+
+                        playerGridX -= 2;
+                        spawnX = x;
+                        spawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 1 && gameGrid[16][x - 1] == 0) {
+                        playerGridX -= 2;
+                        spawnX = x;
+                        spawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x - 1] == 1) {
+                        playerGridX--;
+                        spawnX = x;
+                        spawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x - 1] == 0) {
+                        spawnX = x;
+                        spawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                }
+            }
+            else {  // Spawn single flower for other cases
+                for (int j = 0; j < 30; ++j) {
+                    if (beeGridX - j >= 0 && gameGrid[16][beeGridX - j] == 0) {
+                        spawnX = beeGridX - j;
+                        break;
+                    }
+                    else if (beeGridX - j >= 0 && gameGrid[16][beeGridX - j] == 1) {
+                        playerGridX--;
+                        spawnX = beeGridX - j;
+                        break;
+                    }
+
+                    else if (beeGridX + j < 30 && gameGrid[16][beeGridX + j] == 0) {
+                        spawnX = beeGridX + j;
+                        break;
+                    }
+                    else if (beeGridX + j >= 0 && gameGrid[16][beeGridX + j] == 1) {
+                        playerGridX++;
+                        spawnX = beeGridX + j;
+                        break;
+                    }
+
+                }
+            }
+
+            if (spawnX != -1 && flowerCount < maxFlowers + 1) {
+                if (spawnX2 != -1) {
+                    gameGrid[16][spawnX] = 2;
+                    gameGrid[16][spawnX2] = 2;
+
+                    flowerSprites[flowerCount].setTexture(flowerTexture);
+                    flowerSprites[flowerCount].setPosition(spawnX * boxPixelsX, 16 * boxPixelsY + 32);
+                    flower_exists[flowerCount] = true;
+                    flowerCount++;
+
+                    flowerSprites[flowerCount].setTexture(flowerTexture);
+                    flowerSprites[flowerCount].setPosition(spawnX2 * boxPixelsX, 16 * boxPixelsY + 32);
+                    flower_exists[flowerCount] = true;
+                    flowerCount++;
+                }
+                else {
+                    gameGrid[16][spawnX] = 2;
+                    flowerSprites[flowerCount].setTexture(flowerTexture);
+                    flowerSprites[flowerCount].setPosition(spawnX * boxPixelsX, 16 * boxPixelsY + 32);
+                    flower_exists[flowerCount] = true;
+                    flowerCount++;
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void spawnFastFlower(RenderWindow& window, int fastBee_x[], int fastBee_y[], int gameGrid[20][30], Sprite flowerSprites[], int& flowerCount, Texture& flowerTexture, int fastmaxBees, bool fastBee_exists[], bool flower_exists[], int& playerGridX, bool& firstleft, bool& firstright, int maxFlowers) {
+
+    int fastspawnX = -1;
+    int fastspawnX2 = -1;
+
+
+    for (int i = 0; i < fastmaxBees; i++) {
+        if (fastBee_y[i] == 512 && fastBee_exists[i]) {
+            fastBee_exists[i] = false;
+
+            int fastBeeGridX = (fastBee_x[i] * 30) / 960;
+
+            if (fastBee_x[i] <= 0 && firstleft) {  // Left side spawn with two consecutive flowers
+                for (int x = 0; x < 29; ++x) {
+
+                    if (gameGrid[16][x] == 1 && gameGrid[16][x + 1] == 1) {
+
+                        playerGridX += 2;
+                        fastspawnX = x;
+                        fastspawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 1 && gameGrid[16][x + 1] == 0) {
+                        playerGridX += 2;
+                        fastspawnX = x;
+                        fastspawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x + 1] == 1) {
+                        playerGridX++;
+                        fastspawnX = x;
+                        fastspawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x + 1] == 0) {
+                        fastspawnX = x;
+                        fastspawnX2 = x + 1;
+                        firstleft = false;
+                        break;
+                    }
+                }
+            }
+            else if (fastBee_x[i] >= 920 && firstright) {  // Right side spawn with two consecutive flowers
+                for (int x = 29; x > 0; --x) {
+
+                    if (gameGrid[16][x] == 1 && gameGrid[16][x - 1] == 1) {
+
+                        playerGridX -= 2;
+                        fastspawnX = x;
+                        fastspawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 1 && gameGrid[16][x - 1] == 0) {
+                        playerGridX -= 2;
+                        fastspawnX = x;
+                        fastspawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x - 1] == 1) {
+                        playerGridX--;
+                        fastspawnX = x;
+                        fastspawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                    else if (gameGrid[16][x] == 0 && gameGrid[16][x - 1] == 0) {
+                        fastspawnX = x;
+                        fastspawnX2 = x - 1;
+                        firstright = false;
+                        break;
+                    }
+                }
+            }
+            else {  // Spawn single flower for other cases
+                for (int j = 0; j < 30; ++j) {
+                    if (fastBeeGridX - j >= 0 && gameGrid[16][fastBeeGridX - j] == 0) {
+                        fastspawnX = fastBeeGridX - j;
+                        break;
+                    }
+                    else if (fastBeeGridX - j >= 0 && gameGrid[16][fastBeeGridX - j] == 1) {
+                        playerGridX--;
+                        fastspawnX = fastBeeGridX - j;
+                        break;
+                    }
+
+                    else if (fastBeeGridX + j < 30 && gameGrid[16][fastBeeGridX + j] == 0) {
+                        fastspawnX = fastBeeGridX + j;
+                        break;
+                    }
+                    else if (fastBeeGridX + j >= 0 && gameGrid[16][fastBeeGridX + j] == 1) {
+                        playerGridX++;
+                        fastspawnX = fastBeeGridX + j;
+                        break;
+                    }
+
+                }
+            }
+
+            if (fastspawnX != -1 && flowerCount < maxFlowers + 1) {
+                if (fastspawnX2 != -1) {  // Two flower spawn
+                    gameGrid[16][fastspawnX] = 2;
+                    gameGrid[16][fastspawnX2] = 2;
+
+                    flowerSprites[flowerCount].setTexture(flowerTexture);
+                    flowerSprites[flowerCount].setPosition(fastspawnX * boxPixelsX, 16 * boxPixelsY + 32);
+                    flower_exists[flowerCount] = true;
+                    flowerCount++;
+
+                    flowerSprites[flowerCount].setTexture(flowerTexture);
+                    flowerSprites[flowerCount].setPosition(fastspawnX2 * boxPixelsX, 16 * boxPixelsY + 32);
+                    flower_exists[flowerCount] = true;
+                    flowerCount++;
+                }
+                else {  // Single flower spawn
+                    gameGrid[16][fastspawnX] = 2;
+                    flowerSprites[flowerCount].setTexture(flowerTexture);
+                    flowerSprites[flowerCount].setPosition(fastspawnX * boxPixelsX, 16 * boxPixelsY + 32);
+                    flower_exists[flowerCount] = true;
+                    flowerCount++;
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+void spawnbird(bool& bird_exists, Clock& bird_clock, float& bird_x, float& bird_y) {
+    if (!bird_exists) {
+        if (bird_clock.getElapsedTime().asSeconds() >= (rand() % 10) + 5) {
+            bird_x = 10;
+            bird_y = rand() % resolutionY / 2;
+            bird_exists = true;
+
+            bird_clock.restart();
+        }
+    }
+}
+
+
+void drawHives(RenderWindow& window, Sprite hiveSprites[], bool hive_exists[], float hive_x[], float hive_y[], int hive_count, float prehive_x[], float prehive_y[], Sprite& prehiveSprite, bool prehive_exists[], int maxPreHive) {
+    for (int i = 0; i < hive_count; i++) {
+        if (hive_exists[i]) {
+            hiveSprites[i].setPosition(hive_x[i], hive_y[i]);
+            window.draw(hiveSprites[i]);
+
+        }
+    }
+    for (int i = 0; i < maxPreHive; i++) {
+        if (prehive_exists[i]) {
+            prehiveSprite.setPosition(prehive_x[i], prehive_y[i]);
+            window.draw(prehiveSprite);
+
+        }
+    }
+}
+
+
+
+
+void drawbird(RenderWindow& window, float bird_x, float bird_y, Sprite& birdSprite, bool bird_exists, int bird_direction_x, int bird_direction_y, Clock& bird_clock) {
+
+    if (bird_exists) {
+        static bool isFlapUp = true;
+        if (bird_clock.getElapsedTime().asSeconds() > 0.3) {
+            isFlapUp = !isFlapUp;
+
+            if (bird_direction_x == 1) { // Facing right
+                if (isFlapUp) {
+                    birdSprite.setTextureRect(IntRect(0, 0, 32, 32));
+                }
+                else {
+                    birdSprite.setTextureRect(IntRect(32, 0, 32, 32));
+                }
+            }
+            else if (bird_direction_x == -1) { // Facing left
+                if (isFlapUp) {
+                    birdSprite.setTextureRect(IntRect(32, 0, -32, 32));
+                }
+                else {
+                    birdSprite.setTextureRect(IntRect(64, 0, -32, 32));
+                }
+            }
+            else {
+                if (isFlapUp) {
+                    birdSprite.setTextureRect(IntRect(0, 0, 32, 32));
+                }
+                else {
+                    birdSprite.setTextureRect(IntRect(32, 0, 32, 32));
+                }
+            }
+
+            bird_clock.restart();
+        }
+
+
+        birdSprite.setPosition(bird_x, bird_y);
+        window.draw(birdSprite);
+    }
+}
+void movebird(float& bird_x, float& bird_y, Clock& bird_pause_clock, int& bird_pause_timer, bool& bird_exists, bool& bird_paused, int& bird_direction_x, int& bird_direction_y) {
+    if (bird_exists) {
+        if (bird_paused) {
+
+            if (bird_pause_clock.getElapsedTime().asSeconds() >= bird_pause_timer) {
+                bird_paused = false;
+
+
+                do {
+                    bird_direction_x = (rand() % 3) - 1;
+                    bird_direction_y = (rand() % 3) - 1;
+                } while (bird_direction_x == 0 && bird_direction_y == 0);
+
+                bird_pause_clock.restart();
+            }
+        }
+        else {
+
+            bird_x += bird_direction_x * 3;
+            bird_y += bird_direction_y * 3;
+
+
+            if (bird_y < 0) {
+                bird_y = 0;
+                bird_paused = true;
+                bird_pause_timer = (rand() % 2 + 1);
+                bird_pause_clock.restart();
+            }
+            else if (bird_y > 400) {
+                bird_y = 400;
+                bird_paused = true;
+                bird_pause_timer = (rand() % 2 + 1);
+                bird_pause_clock.restart();
+            }
+
+            if (bird_x < 0) {
+                bird_x = 0;
+                bird_paused = true;
+                bird_pause_timer = (rand() % 2 + 1);
+                bird_pause_clock.restart();
+            }
+            else if (bird_x > resolutionX - 32) {
+                bird_x = resolutionX - 32;
+                bird_paused = true;
+                bird_pause_timer = (rand() % 2 + 1);
+                bird_pause_clock.restart();
+            }
+
+
+            if (bird_pause_clock.getElapsedTime().asSeconds() >= (rand() % 2 + 1)) {
+                bird_paused = true;
+                bird_pause_timer = (rand() % 2 + 1);
+                bird_pause_clock.restart();
+            }
+        }
+    }
+}
+void hummingbirdInteractWithHoneycomb(
+    float& bird_x, float& bird_y, bool& bird_exists, bool& bird_paused,
+    Clock& bird_pause_clock, int& bird_pause_timer,
+    float honeycomb_x[], float honeycomb_y[], bool honeycomb_exists[],
+    float prehoneycomb_x[], float prehoneycomb_y[], bool prehoneycomb_exists[],
+    int maxHoneycombs, int maxPreHoneycombs, int& playerScore, int maxPowerUps, int powerUpType[], float powerUpX[], float powerUpY[], bool powerUpExists[], Clock powerUpDropClock[])
+{
+
+    if (!bird_exists) return;
+
+
+    if (bird_paused) {
+        if (bird_pause_clock.getElapsedTime().asSeconds() >= bird_pause_timer) {
+            bird_paused = false;
+        }
+        return;
+    }
+
+
+    for (int i = 0; i < maxHoneycombs; i++) {
+        if (honeycomb_exists[i]) {
+            if (bird_x + 64 > honeycomb_x[i] &&
+                bird_x < honeycomb_x[i] + 64 &&
+                bird_y + 64 > honeycomb_y[i] &&
+                bird_y < honeycomb_y[i] + 64)
+            {
+
+
+                bird_paused = true;
+                bird_pause_clock.restart();
+                honeycomb_exists[i] = false;
+
+                for (int j = 0; j < maxPowerUps; j++) {
+                    if (!powerUpExists[j]) {
+                        powerUpType[j] = (rand() % 4) + 1; // 1-4
+                        powerUpX[j] = honeycomb_x[i];
+                        powerUpY[j] = honeycomb_y[i]; 
+                        powerUpExists[j] = true;
+                        powerUpDropClock[j].restart();
+                        break;
+                    }
+                }
+                if (bird_y < 64) {
+                    playerScore += 1000;
+                }
+                else if (bird_y >= 64 && bird_y < 192) {
+                    playerScore += 800;
+                }
+                else {
+                    playerScore += 500;
+                }
+
+                break;
+            }
+        }
+    }
+
+
+    for (int i = 0; i < maxPreHoneycombs; i++) {
+        if (prehoneycomb_exists[i]) {
+            if (bird_x + 64 > prehoneycomb_x[i] &&
+                bird_x < prehoneycomb_x[i] + 64 &&
+                bird_y + 64 > prehoneycomb_y[i] &&
+                bird_y < prehoneycomb_y[i] + 64)
+            {
+                bird_paused = true;
+                bird_pause_clock.restart();
+                prehoneycomb_exists[i] = false;
+
+                for (int j = 0; j < maxPowerUps; j++) {
+                    if (!powerUpExists[j]) {
+                        powerUpType[j] = (rand() % 4) + 1; // 1-4
+                        powerUpX[j] = prehoneycomb_x[i]; 
+                        powerUpY[j] = prehoneycomb_y[i];
+                        powerUpExists[j] = true;
+                        powerUpDropClock[j].restart();
+                        break;
+                    }
+                }
+
+                if (bird_y < 64) {
+                    playerScore += 1000;
+                }
+                else if (bird_y >= 64 && bird_y < 192) {
+                    playerScore += 800;
+                }
+                else {
+                    playerScore += 500;
+                }
+
+                break;
+            }
+        }
+    }
+}
+void hummingbirdInteractWithRedHoneycomb(
+    float& bird_x, float& bird_y, bool& bird_exists, bool& bird_paused,
+    Clock& bird_pause_clock, int& bird_pause_timer,
+    float fasthoneycomb_x[], float fasthoneycomb_y[], bool fasthoneycomb_exists[],
+    int fastMaxHoneycombs, int& playerScore, int maxPowerUps, int powerUpType[], float powerUpX[], float powerUpY[], bool powerUpExists[], Clock powerUpDropClock[])
+{
+    //
+    if (!bird_exists) return;
+
+
+    if (bird_paused) {
+        if (bird_pause_clock.getElapsedTime().asSeconds() >= bird_pause_timer) {
+            bird_paused = false;
+        }
+        return;
+    }
+
+
+    for (int i = 0; i < fastMaxHoneycombs; i++) {
+        if (fasthoneycomb_exists[i]) {
+            if (bird_x + 64 > fasthoneycomb_x[i] &&
+                bird_x < fasthoneycomb_x[i] + 64 &&
+                bird_y + 64 > fasthoneycomb_y[i] &&
+                bird_y < fasthoneycomb_y[i] + 64)
+            {
+
+
+                bird_paused = true;
+                bird_pause_clock.restart();
+                fasthoneycomb_exists[i] = false;
+                for (int j = 0; j < maxPowerUps; j++) {
+                    if (!powerUpExists[j]) {
+                        powerUpType[j] = (rand() % 4) + 1; // 1-4
+                        powerUpX[j] = fasthoneycomb_x[i];
+                        powerUpY[j] = fasthoneycomb_y[i];
+                        powerUpExists[j] = true;
+                        powerUpDropClock[j].restart();
+                        break;
+                    }
+                }
+
+                if (bird_y < 64) {
+                    playerScore += 2000;
+                }
+                else if (bird_y >= 64 && bird_y < 192) {
+                    playerScore += 1800;
+                }
+                else { //
+                    playerScore += 1500;
+                }
+
+                break;
+            }
+        }
+    }
+}
+void handleHummingbirdCollision(float& bird_x, float& bird_y, bool& bullet_exists, bool& bird_exists,
+    float bullet_x, float bullet_y, Sound& sound, int& bird_health,
+    int& bird_hit_count, float& respawn_timer, Clock& respawn_clock, Sprite& birdSprite
+) {
+
+
+    if (bird_exists) {
+        if (bullet_x + 16 <= bird_x + 64 && bullet_x >= bird_x &&
+            bullet_y + 16 <= bird_y + 64 && bullet_y >= bird_y) {
+
+            sound.play();
+            bullet_exists = false;
+
+            bird_health--;
+            bird_hit_count++;
+
+            if (bird_health <= 0) {
+
+                respawn_timer = 15;
+                respawn_clock.restart();
+
+
+
+            }
+        }
+    }
+
+    // Respawning
+    if (bird_hit_count == 3) {
+
+        if (bird_x < resolutionX + 32) {
+            birdSprite.setColor(sf::Color::Red);
+            bird_x += 2;
+        }
+        else {
+
+            if (respawn_clock.getElapsedTime().asSeconds() >= respawn_timer) {
+
+                bird_x = resolutionX - 32;
+                bird_y = 150.0f;
+                bird_exists = true;
+                bird_health = 3;
+                bird_hit_count = 0;
+                birdSprite.setColor(sf::Color::White);
+            }
+        }
+    }
+}
+void readhighscores(int highscores[], string playerNames[]) {
+    ifstream file("score.txt");
+
+
+    for (int i = 0; i < 10; i++) {
+        highscores[i] = 0;
+        playerNames[i] = "";
+    }
+
+    if (file.is_open()) {
+        for (int i = 0; i < 10; i++) {
+            if (!(file >> highscores[i] >> playerNames[i])) {
+                break;
+            }
+        }
+        file.close();
+    }
+}
+
+void writeHighScores(int highscores[], string playerNames[]) {
+    ofstream file("score.txt");
+
+    if (file.is_open()) {
+        for (int i = 0; i < 10; i++) {
+            if (highscores[i] > 0) {
+                file << highscores[i] << " " << playerNames[i] << endl;
+            }
+        }
+        file.close();
+    }
+
+}
+void updateHighScores(int& playerScore, int highscores[], string playerNames[], RenderWindow& window) {
+    int lowestScoreIndex = 0;
+    bool scoreQualifies = false;
+
+
+    for (int i = 0; i < 10; i++) {
+        if (playerScore > highscores[i]) {
+            scoreQualifies = true;
+            lowestScoreIndex = i;
+            break;
+        }
+    }
+
+    if (scoreQualifies) {
+
+        Font font;
+        if (!font.loadFromFile("Fonts/Roboto-BlackItalic.ttf")) {
+            cout << "Error loading font!" << endl;
+            return;
+        }
+
+
+        Text titleText, nameInputText, instructionText;
+        titleText.setFont(font);
+        nameInputText.setFont(font);
+        instructionText.setFont(font);
+
+
+        titleText.setString("BRAVO! NEW HIGHSCORE");
+        titleText.setCharacterSize(36);
+        titleText.setFillColor(Color::White);
+        titleText.setPosition((resolutionX - 400) / 2, 100);
+
+
+        instructionText.setString("ENTER YOUR NAME (10 CHARACTERS MAX):");
+        instructionText.setCharacterSize(24);
+        instructionText.setFillColor(Color::White);
+        instructionText.setPosition((resolutionX - 400) / 2, 200);
+
+
+        nameInputText.setCharacterSize(28);
+        nameInputText.setFillColor(Color::Yellow);
+        nameInputText.setPosition((resolutionX - 400) / 2, 300);
+
+        string playerName = "";
+        bool nameEntered = false;
+
+
+        while (!nameEntered) {
+            Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == Event::Closed) {
+                    window.close();
+                    return;
+                }
+
+
+                if (event.type == Event::TextEntered) {
+                    if (event.text.unicode < 128) {
+
+                        if (event.text.unicode == 8 && !playerName.empty()) {
+                            playerName.pop_back();
+                        }
+
+                        else if (event.text.unicode == 13 && !playerName.empty()) {
+                            nameEntered = true;
+                        }
+
+                        else if (playerName.length() < 10) {
+                            playerName += static_cast<char>(event.text.unicode);
+                        }
+                    }
+                }
+            }
+
+
+            nameInputText.setString(playerName);
+
+
+            window.clear(Color::Black);
+            window.draw(titleText);
+            window.draw(instructionText);
+            window.draw(nameInputText);
+            window.display();
+        }
+
+        // Update the high scores
+        for (int i = 9; i > lowestScoreIndex; i--) {
+            highscores[i] = highscores[i - 1];
+            playerNames[i] = playerNames[i - 1];
+        }
+        highscores[lowestScoreIndex] = playerScore;
+        playerNames[lowestScoreIndex] = playerName;
+    }
+}
+
+// Function to display highscores
+int displayHighScores(RenderWindow& window, int highscores[], string playerNames[]) {
+    // Clear window
+    window.clear(Color::Black);
+
+
+    Font font;
+    if (!font.loadFromFile("Fonts/Roboto-BlackItalic.ttf")) {
+        cout << "Error loading font!" << endl;
+        return 7;
+    }
+
+    // Title
+    Text titleText;
+    titleText.setFont(font);
+    titleText.setString("High Scores");
+    titleText.setCharacterSize(40);
+    titleText.setFillColor(Color::Yellow);
+    titleText.setPosition((resolutionX - 250) / 2, 50);
+
+
+    Text highScoreTexts[10];
+    for (int i = 0; i < 10; i++) {
+        highScoreTexts[i].setFont(font);
+
+
+        if (highscores[i] > 0) {
+            string scoreEntry = to_string(i + 1) + " .  " +
+                playerNames[i] + " -- " +
+                to_string(highscores[i]);
+            highScoreTexts[i].setString(scoreEntry);
+        }
+        else {
+            highScoreTexts[i].setString("");
+        }
+
+        highScoreTexts[i].setCharacterSize(24);
+        highScoreTexts[i].setFillColor(Color::White);
+        highScoreTexts[i].setPosition(resolutionX / 2 - 150, 150 + i * 40);
+    }
+
+
+    Text navText;
+    navText.setFont(font);
+    navText.setString("Press ESC to Return to Main Menu");
+    navText.setCharacterSize(18);
+    navText.setFillColor(Color::White);
+    navText.setPosition(resolutionX / 2 - 150, resolutionY - 50);
+
+
+    while (window.isOpen()) {
+        Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == Event::Closed) {
+                window.close();
+                return 7;
+            }
+
+            if (event.type == Event::KeyPressed) {
+                if (event.key.code == Keyboard::Escape) {
+                    return 0;
+                }
+            }
+        }
+
+
+        window.clear(Color::Black);
+        window.draw(titleText);
+        for (int i = 0; i < 10; i++) {
+            if (!highScoreTexts[i].getString().isEmpty()) {
+                window.draw(highScoreTexts[i]);
+            }
+        }
+        window.draw(navText);
+        window.display();
+    }
+
+    return 0;
+}
